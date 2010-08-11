@@ -29,6 +29,7 @@ The macro expands into a loop/recur form that is side-effect free and
 typically very fast.
 
 There are several different types of iteration clauses:
+
 * Driver clauses specify values to iterate over
 * Gatherer clauses collect information during the iteration
 * Control flow clauses can cause early termination of the loop
@@ -80,13 +81,13 @@ any of the driver clauses reach their stopping criteria.
 
 Clj-iterate supports the following numeric driver clauses:
 
-            {:for var :from expr [:to expr] [:by expr]} 
+        {:for var :from expr [:to expr] [:by expr]} 
 
 Iterates over the integers from the `:from` expr to the `:to` expr. If
 `:to` is missing, this clause will count forever.  If there is a 'by'
 clause increment by that amount on each iteration.
 
-           {:for var :downfrom expr [:to expr] [:by expr]}
+        {:for var :downfrom expr [:to expr] [:by expr]}
 
 Same as the `:from` form, except we are counting down instead of
 up. Note: the `:by` expression must be negative for the loop to
@@ -133,38 +134,39 @@ Here is an example illustrating these options:
 
 Clj-iterate supports the following gatherer clauses:
 
-            {:sum expr [ :into var ] [ :if pred ] }
+        {:sum expr [ :into var ] [ :if pred ] }
 
-Sum the 'expr' over all loop iterations.
+Sum the `expr` over all loop iterations.
 
-            {:multiply expr [ :into var ] [ :if pred ] }
+        {:multiply expr [ :into var ] [ :if pred ] }
 
-            {:collect expr [ :into var ] [ :if pred ] }
+        {:collect expr [ :into var ] [ :if pred ] }
 
-            {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] }
+        {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] }
 
-Reduce the values returned by `expr` using 'fn'. Iter mimics the
-clojure 'reduce' function in that if zero values are reduced, the
+Reduce the values returned by `expr` using `fn`. `Iter` mimics the
+clojure `reduce` function in that if zero values are reduced, the
 result is the function applied with no arguments.
 
-For example, if iter did not have a sum clause you could implement it like this:
+For example, if `iter` did not have a sum clause you could implement it like this:
 
         (iter {:for x :from 1 :to 10} 
               {:reduce x :by +})
 
-If you provide an initial value with :initially, that value is used as
-a starting point for the reduction. Iter can generate more efficient
-code with the :initially, and the reduction function need not accept
-zero elements. Therefore, we could implement :sum more efficiently as follows:
+If you provide an initial value with `:initially`, that value is used
+as a starting point for the reduction. `Iter` can generate more
+efficient code with the `:initially` option, and the reduction
+function need not accept zero elements. Therefore, we could implement
+`:sum` more efficiently as follows:
 
          (iter {:for x :from 1 :to 10} 
                {:reduce x :by + :initially 0})
 
-This is, in fact, how the :sum clause is implemented.
+This is, in fact, how the `:sum` clause is implemented.
 
 ## Control Flow Clauses
 
-           {:return expr :if pred}
+        {:return expr :if pred}
 
 If `pred` is true, immediately exit the loop returning `expr`.
 
