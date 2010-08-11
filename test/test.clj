@@ -1,5 +1,6 @@
 (ns test
-  (:use clojure.test iterate))
+  (:use clojure.test)
+  (:use iterate))
 
 (deftest iter-test
   (is (= (iter {:for x :from 0 :to 10}
@@ -42,8 +43,8 @@
          [10 9 8 7 6 5 4 3 2 1]))
 
   (is (= (iter {:for x :downfrom 10}
-                {:for y :from 1 :to 3}
-                {:collect x})
+               {:for y :from 1 :to 3}
+               {:collect x})
          [10 9 8]))
 
   (is (= (iter {:for x :in (range 0 10)}
@@ -69,16 +70,10 @@
   (is (= (iter {:repeat 100}
                 {:sum 1})
          100))
+
   (is (= (iter {:for x :from 1 :to 10}
                (println x))
          nil))
-
-  ;; synonym for collect
-  #_
-  (iter {:for x :from 1 :to 10}
-         {:reduce x :by conj :initially (clojure.lang.PersistentQueue/EMPTY) :into foo}
-         {:returning (seq foo)}
-         )
 
   (is (= (iter {:for x :on (range 0 3)}
                 {:collect x})
@@ -89,4 +84,11 @@
                 {:collect x :into evens :if (even? x)}
                 {:collect x :into odds :if (odd? x)}
                 {:returning [(seq evens) (seq odds)]})
-         [(filter even? (range 0 101)) (filter odd? (range 0 101))])))
+         [(filter even? (range 0 101)) (filter odd? (range 0 101))]))
+
+  (is (= (iter {:for x :from 1 :to 5}
+               {:for y :downfrom 5 :to 1}
+               {:collect [x y]})
+         [[1 5] [2 4] [3 3] [4 2] [5 1]])
+      )
+)

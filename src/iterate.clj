@@ -1,188 +1,211 @@
 (ns iterate
-  (:use clojure.test clojure.set))
+  (:use clojure.test clojure.set clojure.walk))
 
-(defonce *reduce-marker* (Object.))
 
 ;; stub implementation (the real implementation uses the iter macro, below)
 (defn- check-form [form required optional]
   )
 
-(defmacro iter [ & body ]
-  (let [initial-bindings (atom ()) ;; initial loop variable bindings in [var binding var binding .. ] form
-        recur-vals (atom ()) ;; recursion values for the 'initial-bindings', in the same order as the initial-bindings
-        let-bindings (atom ()) ;; variable computed based on current loop values that don't need to recur themselves
-        side-effects (atom ()) ;; arbitrary forms to evaluate on each iteration
-        return-tests (atom ()) ;; tests to see if the recursion is done
-        return-value (atom nil) ;; value to return
-        non-local-returns (atom ()) ;; test and value for special case return values (:return :if clause)
-        ]
-    (loop [body body]
-      (if (empty? body)
-        `(loop ~ (apply vector @initial-bindings)
-           (let ~ (apply vector @let-bindings)
 
-             (cond (or ~@ @return-tests)
-                   ~ @return-value
+;; used to represent a reduction with zero items in it
+(defonce *reduce-marker* (Object.))
 
-                     ~@(apply concat @non-local-returns)
-                     
-                     true
-                     (do
-                       ~@(reverse @side-effects)
-                       (recur ~@ @recur-vals)))))
+;; used to mark the place in the form where we want the recur to occur
+(defonce *recur-marker* (Object.))
+
+;; take the body of an iter and expand it into a map of the following items:
+;; :initial - initial loop variable bindings in [var binding var binding .. ] form
+;; :recur - recursion values for the :initial, in the same order
+;; :lets - variables computed based on current loop values that don't need to recur themselves
+;; :return-val - the value to return when the looping terminates
+;; :return-tests - a list of forms. if any eval to true, looping is finished
+;; :code - code that should be evalled each time through the loop
+(defn iter-expand [body]
+  (cond (empty? body)
+        {:initial () :recur () :code (list *recur-marker*) :return-tests ()}
+
+        (map? (first body))
+        ;; we have a map, which means it is an iteration clause
+        (let [form (first body)
+              form-keys (set (keys form))]
+          (cond                   
+
+           (contains? form :returning)
+           (do
+             (check-form form #{:returning} #{})
+             (assoc (iter-expand (rest body))
+               :return-val (:returning form)))
+
+           (contains? form :return)
+           (do
+             (check-form form #{:return :if} #{})
+             (let [downstream (iter-expand (rest body))]
+               (assoc downstream
+                 :code `((if ~(:if form)
+                           ~(:return form)
+                           (do ~@(:code downstream)))))))
+
+           (contains? form :repeat)
+           (do
+             (check-form form #{:repeat} #{})
+             (iter-expand (cons {:for (gensym) :from 1 :to (:repeat form)}
+                                (rest body))))
+           
+           (subset? [:for :from :to] form-keys)
+           (merge-with concat
+                       (iter-expand (cons (dissoc form :to) (rest body)))
+                       {:return-tests `((> ~(:for form) ~(:to form)))})
+
+           (subset? [:for :downfrom :to] form-keys)
+           (do
+             (check-form form #{:for :downfrom :to} #{:by})
+             (let [downstream (iter-expand (cons {:for (:for form) 
+                                                  :from (:downfrom form)
+                                                  :by (or (:by form) -1)}
+                                                 (rest body)))]
+               (assoc downstream
+                 :return-tests (cons `(<  ~(:for form) ~(:to form)) (:return-tests downstream)))))
+
+           (subset? [:for :downfrom] form-keys)
+           (do
+             (check-form form #{:for :downfrom} #{:by})
+             (iter-expand (cons {:for (:for form) 
+                                 :from (:downfrom form)
+                                 :by (or (:by form) -1)}
+                                (rest body))))
+
+           (subset? [:for :from] form-keys)
+           (do 
+             (check-form form #{:for :from} #{:by})
+             (iter-expand (cons {:for (:for form) 
+                                 :initially `(int ~(:from form)) 
+                                 :then (if (nil? (:by form))
+                                         `(inc ~(:for form))
+                                         `(int (+  ~(:for form)  ~(:by form))))}
+                                (rest body))))
+
+           (subset? [:for :in] form-keys)
+           (let [seq-var (gensym)]
+             (check-form form #{:for :in} #{})
+             (merge-with concat 
+                         (iter-expand (rest body))
+                         {:initial (list seq-var (:in form))
+                          :recur `((next ~seq-var))
+                          :lets (list (:for form) `(first ~seq-var))
+                          :return-tests `((empty? ~seq-var))}))
+
+           (subset? [:for :on] form-keys)
+           (do
+             (check-form form #{:for :on} #{})
+             (merge-with concat 
+                         (iter-expand (rest body))
+                         {:initial (list (:for form) (:on form))
+                          :recur `((next ~(:for form)))
+                          :return-tests `((empty? ~(:for form)))}))
+           
+           (subset? [:for :initially :then] form-keys)
+           (do 
+             (check-form form #{:for :initially :then} #{})
+             (merge-with concat
+                         {:initial [(:for form) (:initially form)]
+                          :recur [(:then form)]
+                          :code ()}
+                         (iter-expand (rest body))))
+
+           ;; reduce case with :initially
+           (subset? [:reduce :into :initially] form-keys)
+           (do
+             (check-form form #{:reduce :by :into :initially} #{:if})
+             (let [downstream (iter-expand (rest body))]
+               (merge downstream
+                      {:initial (concat [(:into form) (:initially form)] (:initial downstream))
+                       :recur (cons (:into form) (:recur downstream))
+                       :code `((let [~(:into form) ~(if (nil? (:if form))
+                                                      `(~(:by form) ~(:into form) ~(:reduce form))
+                                                      `(if ~(:if form)
+                                                         (~(:by form) ~(:into form) ~(:reduce form))
+                                                         ~(:into form)))]
+                                 ~@(:code downstream)))})))
+
+           (subset? [:reduce :initially] form-keys)
+           (do
+             (check-form form #{:reduce :by :initially} #{:if})
+             (let [out-var (gensym)
+                   downstream (iter-expand (cons (assoc form :into out-var) (rest body)))]
+               (assoc downstream :return-val out-var :return-val out-var)))
+
+           ;; reduce case without :initially
+           (subset? [:reduce :into] form-keys)
+           (do
+             (check-form form #{:reduce :by :into} #{:if})
+             (let [downstream (iter-expand (rest body))]
+               (assoc downstream
+                 :initial (list* (:into form) '*reduce-marker* (:initial downstream))
+                 :recur (cons (:into form) (:recur downstream))
+                 :code `((let [~(:into form) ~(if (nil? (:if form))
+                                                `(cond (= ~(:into form) *reduce-marker*)
+                                                       ~(:reduce form)
+                                                       true
+                                                       (~(:by form) ~(:into form) ~(:reduce form)))
+                                                `(cond (not ~(:if form))
+                                                       ~(:into form)
+                                                       (= ~(:into form) *reduce-marker*)
+                                                       ~(:reduce form)
+                                                       true
+                                                       (~(:by form) ~(:into form) ~(:reduce form))))]
+                           (do ~@(:code downstream)))))))
+
+           (contains? form :reduce)
+           (let [into-var (gensym)]
+             (check-form form #{:reduce :by} #{:if})
+             (assoc (iter-expand (cons (assoc form :into into-var)
+                                       (rest body)))
+               :return-val into-var))
+
+
+           (contains? form :collect)
+           (do (check-form form #{:collect} #{:into :if})
+               (iter-expand (cons (assoc (dissoc form :collect)
+                                    :reduce (:collect form)
+                                    :by conj
+                                    :initially '(clojure.lang.PersistentQueue/EMPTY))
+                                  (rest body))))
+
+           (contains? form :sum)
+           (do (check-form form #{:sum} #{:into :if})
+               (iter-expand (cons (assoc (dissoc form :sum)
+                                    :reduce (:sum form)
+                                    :by '+
+                                    :initially 0)
+                                  (rest body))))
+
+           (contains? form :multiply)
+           (do (check-form form #{:multiply} #{:into :if})
+               (iter-expand (cons (assoc (dissoc form :multiply)
+                                    :reduce (:multiply form)
+                                    :by '*
+                                    :initially 1)
+                                  (rest body))))
+           
+
+           true
+           (throw (java.lang.Exception. (str "Unparsable iter form " form) ))))
         
-        (let [form (first body)]
-          (cond (list? form)
-                ;; a list is arbitrary clojure code for the body of the iteration
-                (do
-                  (swap! side-effects #(cons form %))
-                  (recur (rest body)))
+        true
+        ;; not an iter clause, just code
+        (merge-with concat
+                    {:code (list (first body))}
+                    (iter-expand (rest body)))))
 
-                (map? form)
-                ;; maps identify iteration clauses
-                (let [form-keys (set (keys form))]
-                  (cond (contains? form :returning)
-                        (do
-                          (check-form form #{:returning} #{})
-                          (swap! return-value (fn [x] (:returning form)))
-                          (recur (rest body)))
-
-                        (contains? form :return)
-                        (do
-                          (check-form form #{:return :if} #{})
-                          (swap! non-local-returns #(concat % `((~(:if form) ~(:return form)))))
-                          (recur (rest body)))
-
-                        (contains? form :repeat)
-                        (let [iter-var (gensym)]
-                          (check-form form #{:repeat} #{})
-                          (recur (cons {:for iter-var :from 1 :to (:repeat form)}
-                                       (rest body))))
-                        
-                        ;; integer counting with termination
-                        (subset? [:for :from :to] form-keys)
-                        (do
-                          (check-form form #{:for :from :to} #{:by})
-                          (swap! return-tests #(cons `(> ~(:for form) ~(:to form)) %))
-                          (recur (cons (dissoc form :to)
-                                       (rest body))))
-
-                        ;; integer counting
-                        (subset? [:for :from] form-keys)
-                        (do
-                          (check-form form #{:for :from} #{:by})
-                          (recur (cons (if (contains? form :by)
-                                         {:for (:for form) :initially (:from form) :then `(+ ~(:by form) ~(:for form))}
-                                         {:for (:for form) :initially (:from form) :then `(inc ~(:for form))})
-                                       (rest body))))
-
-                        (subset? [:for :downfrom :to] form-keys)
-                        (do
-                          (check-form form #{:for :downfrom :to} #{:by})
-                          (swap! return-tests #(cons `(< ~(:for form) ~(:to form)) %))
-                          (recur (cons (dissoc form :to)
-                                       (rest body))))
-
-                        ;; integer counting
-                        (subset? [:for :downfrom] form-keys)
-                        (do
-                          (check-form form #{:for :downfrom} #{:by})
-                          (recur (cons (if (contains? form :by)
-                                         {:for (:for form) :initially (:downfrom form) :then `(+ ~(:for form) ~(:by form))}
-                                         {:for (:for form) :initially (:downfrom form) :then `(dec ~(:for form))})
-                                       (rest body))))
-
-                        (subset? [:for :in] form-keys)
-                        (let [seq-var (gensym)]
-                          (check-form form #{:for :in} #{})
-                          (swap! initial-bindings #(concat % `( ~seq-var ~(:in form) )))
-                          (swap! recur-vals #(concat % `( (rest ~seq-var) )))
-                          (swap! let-bindings #(concat % `(~(:for form) (first ~seq-var))))
-                          (swap! return-tests #(cons `(empty? ~seq-var) %))
-                          (recur (rest body)))
-
-                        (subset? [:for :on] form-keys)
-                        (do
-                          (check-form form #{:for :on} #{})
-                          (swap! initial-bindings #(concat % `( ~(:for form) ~(:on form) )))
-                          (swap! recur-vals #(concat % `( (rest ~(:for form)) )))
-                          (swap! return-tests #(cons `(empty? ~(:for form)) %))
-                          (recur (rest body)))
-                        
-                        (subset? [:for :initially :then] form-keys)
-                        (do
-                          (check-form form #{:for :initially :then} #{})
-                          (swap! initial-bindings #(concat % `( ~(:for form) ~(:initially form) )))
-                          (swap! recur-vals #(concat % `(~(:then form))))
-                          (recur (rest body)))
-
-                        ;; reduce implementation
-                        (and (contains? form :reduce)
-                             (not (contains? form :into)))
-                        (let [into-var (gensym)]
-                          (check-form form #{:reduce :by} #{:if :initially})
-                          ;; if we don't have the :initially key, we need to use the reduce marker
-                          (if (contains? form :initially)
-                            (swap! return-value (fn [x] into-var))
-                            (swap! return-value (fn [x] `(if (= ~into-var *reduce-marker*)
-                                                           (~(:by form))
-                                                           ~into-var))))
-                          (recur (cons (assoc form :into into-var)
-                                       (rest body))))
-
-                        (subset? [:reduce :initially] form-keys)
-                        ;; since we have :initially, we don't need to
-                        ;; use the *reduce-marker* and can generate more
-                        ;; efficient code
-                        (do
-                          (check-form form #{:reduce :by :into :initially} #{:if})
-                          (swap! initial-bindings #(concat % `( ~(:into form) ~(:initially form) )))
-                          (swap! recur-vals #(concat % (if (nil? (:if form))
-                                                         `((~(:by form) ~(:into form) ~(:reduce form)))
-                                                         `((if ~(:if form)
-                                                             (~(:by form) ~(:into form) ~(:reduce form))
-                                                             ~(:into form))))))
-                          (recur (rest body)))
-
-                        (contains? form :reduce)
-                        ;; reduce case without :initially
-                        (do
-                          (check-form form #{:reduce :by :into} #{:if})
-                          (swap! initial-bindings #(concat % `( ~(:into form) *reduce-marker* )))
-                          (swap! recur-vals #(concat % (if (nil? (:if form))
-                                                         `((cond (= ~(:into form) *reduce-marker*)
-                                                                 ~(:reduce form)
-                                                                 (true
-                                                                  (~(:by form) ~(:into form) ~(:reduce form)))))
-
-                                                         `((cond (not ~(:if form))
-                                                                 ~(:into form)
-                                                                 (= ~(:into form) *reduce-marker*)
-                                                                 ~(:reduce form)
-                                                                 true
-                                                                 (~(:by form) ~(:into form) ~(:reduce form)))))))
-                          (recur (rest body)))
-
-                        (contains? form :sum)
-                        (do (check-form form #{:sum} #{:into :if})
-                            (recur (cons (merge {:reduce (:sum form) :by '+ :initially 0}
-                                                (dissoc form :sum))
-                                         (rest body))))
-
-                        (contains? form :multiply)
-                        (do (check-form form #{:multiply} #{:into :if})
-                            (recur (cons (merge {:reduce (:multiply form) :by '* :initially 1}
-                                                (dissoc form :multiply))
-                                         (rest body))))
-
-                        (contains? form :collect)
-                        (do (check-form form #{:collect} #{:into :if})
-                            (recur (cons (merge {:reduce (:collect form) :by conj :initially '(clojure.lang.PersistentQueue/EMPTY)}
-                                                (dissoc form :collect))
-                                         (rest body))))
-                        
-                        true
-                        (throw (java.lang.Exception. (str "Unparsable iter form " form) ))))))))))
+(defmacro iter [& body]
+  (let [parse (iter-expand body)
+        code (postwalk #(if (= % *recur-marker*) `(recur ~@(:recur parse)) %)
+                       (:code parse))]
+    `(loop ~(apply vector (:initial parse))
+       (let ~(apply vector (:lets parse))
+         (if (or ~@(:return-tests parse))
+           ~(:return-val parse)
+           (do ~@code))))))
 
 (defn- check-form [form required optional]
   "Utility to check the syntax of iter clauses"
