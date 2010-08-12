@@ -1,6 +1,6 @@
 # clj-iterate - An iteration macro patterned after Common Lisp's Iterate
 
-I wrote clj-iterate after using Daniel Janus excellent clj-iter
+I wrote clj-iterate after using Daniel Janus excellent [clj-iter] [1]
 package. I needed a larger subset of common lisp's iterate than
 clj-iter provided. Unfortunately the bit I needed (the INTO clause)
 required a rewrite.
@@ -65,6 +65,24 @@ Also:
         (1 2 3 4)
         user> 
         
+## Iteration Using Primitive Types
+
+Some clauses that introduce a new loop variable take a `:type`
+option. If given, the loop variable will of that primitive type,
+making the code more efficient. 
+
+For example:
+
+        user> (time (iter {:repeat 10000000}
+                          {:sum 1}))
+        "Elapsed time: 421.595 msecs"
+        10000000
+        user> (time (iter {:repeat 10000000}
+                          {:sum 1 :type int}))
+        "Elapsed time: 249.043 msecs"
+        10000000
+        user> 
+
 ## Driver Clauses
 
 Driver clauses are all executed in parallel. The loop terminates when
@@ -81,27 +99,33 @@ any of the driver clauses reach their stopping criteria.
 
 Clj-iterate supports the following numeric driver clauses:
 
-        {:for var :from expr [:to expr] [:by expr]} 
+        {:for var :from expr [:to expr] [:by expr] [:type type]} 
 
 Iterates over the integers from the `:from` expr to the `:to` expr. If
 `:to` is missing, this clause will count forever.  If there is a 'by'
 clause increment by that amount on each iteration.
 
-        {:for var :downfrom expr [:to expr] [:by expr]}
+        {:for var :downfrom expr [:to expr] [:by expr] [:type type]}
 
 Same as the `:from` form, except we are counting down instead of
-up. Note: the `:by` expression must be negative for the loop to
-terminate.
+up. Note: the `:by` expression must be negative (or absent) for the
+loop to terminate.
 
-        {:repeat n}
+        {:repeat n [:using var]}
 
-Repeat the loop `n` times.
+Repeat the loop `n` times. If the `using` option is present, expose
+the iteration variable by that name.
 
 ### Sequence Driver Clauses
 
         {:for var :in expr}
 
-Iterates over the sequence returned by `expr`, binding `var` to each element.
+Iterates over the sequence returned by `expr`, binding `var` to each
+element. 
+
+Note that there is no `:type` option for this clause because the items
+in the sequence are probably already boxed. Adding a type declaration
+would probably slow the loop down.
 
         {:for var :on expr}
 
@@ -128,27 +152,28 @@ Here is an example illustrating these options:
         user> (iter {:for x :from 0 :to 10}
                     {:collect x :into evens :if (even? x)}
                     {:collect x :into odds :if (odd? x)}
-                    {:returning [(seq evens) (seq odds)]})
+                    {:returning [evens odds]})
         [(0 2 4 6 8 10) (1 3 5 7 9)]
         user> 
 
 Clj-iterate supports the following gatherer clauses:
 
-        {:sum expr [ :into var ] [ :if pred ] }
+        {:sum expr [ :into var ] [ :if pred ] [:type type]}
 
 Sum the `expr` over all loop iterations.
 
-        {:multiply expr [ :into var ] [ :if pred ] }
+        {:multiply expr [ :into var ] [ :if pred ] [:type type]}
 
         {:collect expr [ :into var ] [ :if pred ] }
 
-        {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] }
+        {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] [:type type]}
 
 Reduce the values returned by `expr` using `fn`. `Iter` mimics the
 clojure `reduce` function in that if zero values are reduced, the
 result is the function applied with no arguments.
 
-For example, if `iter` did not have a sum clause you could implement it like this:
+For example, if `iter` did not have a sum clause you could implement
+it like this:
 
         (iter {:for x :from 1 :to 10} 
               {:reduce x :by +})
@@ -174,21 +199,22 @@ If `pred` is true, immediately exit the loop returning `expr`.
 
 ### Drivers 
 
-            {:for var :from expr [:to expr] [:by expr]} 
-            {:for var :downfrom expr [:to expr] [:by expr]}
-            {:repeat n}        
+            {:for var :from expr [:to expr] [:by expr] [:type type]} 
+            {:for var :downfrom expr [:to expr] [:by expr] [:type type]}
+            {:repeat n [:using var]}        
             {:for var :in expr}
             {:for var :on expr}
 
 ### Gatherers
 
-            {:sum expr [ :into var ] [ :if pred ] }
-            {:multiply expr [ :into var ] [ :if pred ] }
-            {:collect expr [ :into var ] [ :if pred ] }
-            {:reduce expr :by fn  [ :initially expr ] [ :into var ] [ :if pred ] }
+            {:sum expr [ :into var ] [ :if pred ] [:type type]}
+            {:multiply expr [ :into var ] [ :if pred ] [:type type]}
+            {:collect expr [ :into var ] [ :if pred ]}
+            {:reduce expr :by fn  [ :initially expr ] [ :into var ] [ :if pred ]  [:type type]}
             {:returning expr}
 
 ### Control Flow
 
             {:return expr :if pred}
 
+[1]: http://github.com/nathell/clj-iter

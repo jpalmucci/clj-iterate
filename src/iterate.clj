@@ -47,9 +47,12 @@
 
            (contains? form :repeat)
            (do
-             (check-form form #{:repeat} #{})
-             (iter-expand (cons {:for (gensym) :from 1 :to (:repeat form)}
-                                (rest body))))
+             (check-form form #{:repeat} #{:using})
+             (let [iter-var (if (nil? (:using form))
+                              (gensym)
+                              (:using form))]
+               (iter-expand (cons {:for iter-var :from 1 :to (:repeat form) :type 'int}
+                                  (rest body)))))
            
            (subset? [:for :from :to] form-keys)
            (merge-with concat
@@ -58,30 +61,36 @@
 
            (subset? [:for :downfrom :to] form-keys)
            (do
-             (check-form form #{:for :downfrom :to} #{:by})
-             (let [downstream (iter-expand (cons {:for (:for form) 
-                                                  :from (:downfrom form)
-                                                  :by (or (:by form) -1)}
+             (check-form form #{:for :downfrom :to} #{:by :type})
+             (let [downstream (iter-expand (cons (assoc (dissoc form :downfrom :to)
+                                                   :from (:downfrom form)
+                                                   :by (or (:by form) -1))
                                                  (rest body)))]
                (assoc downstream
                  :return-tests (cons `(<  ~(:for form) ~(:to form)) (:return-tests downstream)))))
 
            (subset? [:for :downfrom] form-keys)
            (do
-             (check-form form #{:for :downfrom} #{:by})
-             (iter-expand (cons {:for (:for form) 
-                                 :from (:downfrom form)
-                                 :by (or (:by form) -1)}
+             (check-form form #{:for :downfrom} #{:by :type})
+             (iter-expand (cons (assoc (dissoc form :downfrom)
+                                  :from (:downfrom form)
+                                  :by (or (:by form) -1))
                                 (rest body))))
 
            (subset? [:for :from] form-keys)
            (do 
-             (check-form form #{:for :from} #{:by})
+             (check-form form #{:for :from} #{:by :type})
              (iter-expand (cons {:for (:for form) 
-                                 :initially `(int ~(:from form)) 
-                                 :then (if (nil? (:by form))
-                                         `(inc ~(:for form))
-                                         `(int (+  ~(:for form)  ~(:by form))))}
+                                 :initially (if (not (nil? (:type form)))
+                                              `(~(:type form) ~(:from form))
+                                              (:from form))
+                                 :then (if (contains? #{'int 'long} (:type form))
+                                         `(unchecked-add ~(:for form)  ~(or (:by form) 1))
+                                         (if (nil? (:by form))
+                                           `(inc ~(:for form))
+                                           (if (nil? (:type form))
+                                             `(+  ~(:for form)  ~(:by form))
+                                             `(~(:type form)  (+  ~(:for form)  ~(:by form))))))}
                                 (rest body))))
 
            (subset? [:for :in] form-keys)
@@ -115,21 +124,30 @@
            ;; reduce case with :initially
            (subset? [:reduce :into :initially] form-keys)
            (do
-             (check-form form #{:reduce :by :into :initially} #{:if})
-             (let [downstream (iter-expand (rest body))]
-               (merge downstream
-                      {:initial (concat [(:into form) (:initially form)] (:initial downstream))
-                       :recur (cons (:into form) (:recur downstream))
-                       :code `((let [~(:into form) ~(if (nil? (:if form))
+             (check-form form #{:reduce :by :into :initially} #{:if :type})
+             (let [downstream (iter-expand (rest body))
+                   new-value-code (if (nil? (:if form))
                                                       `(~(:by form) ~(:into form) ~(:reduce form))
                                                       `(if ~(:if form)
                                                          (~(:by form) ~(:into form) ~(:reduce form))
                                                          ~(:into form)))]
+               (merge downstream
+                      {:initial (list* (:into form) (if (nil? (:type form))
+                                                      (:initially form)
+                                                      `(~(:type form) ~(:initially form)))
+                                       (:initial downstream))
+                       :recur (cons (if (nil? (:type form))
+                                                      (:into form)
+                                                      `(~(:type form) ~(:into form)))
+                                    (:recur downstream))
+                       :code `((let [~(:into form) ~(if (nil? (:type form))
+                                                      new-value-code
+                                                      `(~(:type form) ~new-value-code))]
                                  ~@(:code downstream)))})))
 
            (subset? [:reduce :initially] form-keys)
            (do
-             (check-form form #{:reduce :by :initially} #{:if})
+             (check-form form #{:reduce :by :initially} #{:if :type})
              (let [out-var (gensym)
                    downstream (iter-expand (cons (assoc form :into out-var) (rest body)))]
                (assoc downstream :return-val out-var :return-val out-var)))
@@ -137,7 +155,7 @@
            ;; reduce case without :initially
            (subset? [:reduce :into] form-keys)
            (do
-             (check-form form #{:reduce :by :into} #{:if})
+             (check-form form #{:reduce :by :into} #{:if :type})
              (let [downstream (iter-expand (rest body))]
                (assoc downstream
                  :initial (list* (:into form) '*reduce-marker* (:initial downstream))
@@ -157,33 +175,37 @@
 
            (contains? form :reduce)
            (let [into-var (gensym)]
-             (check-form form #{:reduce :by} #{:if})
+             (check-form form #{:reduce :by} #{:if :type})
              (assoc (iter-expand (cons (assoc form :into into-var)
                                        (rest body)))
                :return-val into-var))
 
 
            (contains? form :collect)
-           (do (check-form form #{:collect} #{:into :if})
+           (do (check-form form #{:collect} #{:into :if :type})
                (iter-expand (cons (assoc (dissoc form :collect)
                                     :reduce (:collect form)
-                                    :by conj
+                                    :by 'conj
                                     :initially '(clojure.lang.PersistentQueue/EMPTY))
                                   (rest body))))
 
            (contains? form :sum)
-           (do (check-form form #{:sum} #{:into :if})
+           (do (check-form form #{:sum} #{:into :if :type})
                (iter-expand (cons (assoc (dissoc form :sum)
                                     :reduce (:sum form)
-                                    :by '+
+                                    :by (if (contains? #{'int 'long} (:type form))
+                                          'unchecked-add
+                                          '+)
                                     :initially 0)
                                   (rest body))))
 
            (contains? form :multiply)
-           (do (check-form form #{:multiply} #{:into :if})
+           (do (check-form form #{:multiply} #{:into :if :type})
                (iter-expand (cons (assoc (dissoc form :multiply)
                                     :reduce (:multiply form)
-                                    :by '*
+                                    :by (if (contains? #{'int 'long} (:type form))
+                                          'unchecked-multiply
+                                          '*)
                                     :initially 1)
                                   (rest body))))
            
