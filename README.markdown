@@ -168,7 +168,7 @@ Mutiply the `expr` together. Return 1 if there are no values.
 
         {:collect expr [ :into var ] [ :if pred ] }
 
-Collect `expr` into a sequence. Specifically a persistent queue.
+Collect `expr` into a sequence (specifically a persistent queue).
 
         {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] [:type type]}
 
