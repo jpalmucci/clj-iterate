@@ -68,8 +68,8 @@ Also:
 ## Iteration Using Primitive Types
 
 Some clauses that introduce a new loop variable take a `:type`
-option. If given, the loop variable will of that primitive type,
-making the code more efficient. 
+option. If given, the loop variable will be of that primitive type,
+making the code more efficient.
 
 For example:
 
@@ -164,7 +164,11 @@ Sum the `expr` over all loop iterations.
 
         {:multiply expr [ :into var ] [ :if pred ] [:type type]}
 
+Mutiply the `expr` together. Return 1 if there are no values.
+
         {:collect expr [ :into var ] [ :if pred ] }
+
+Collect `expr` into a sequence. Specifically a persistent queue.
 
         {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] [:type type]}
 
