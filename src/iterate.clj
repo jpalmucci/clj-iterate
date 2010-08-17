@@ -1,11 +1,9 @@
 (ns iterate
   (:use clojure.test clojure.set clojure.walk))
 
-
 ;; stub implementation (the real implementation uses the iter macro, below)
 (defn- check-form [form required optional]
   )
-
 
 ;; used to represent a reduction with zero items in it
 (defonce *reduce-marker* (Object.))
@@ -208,6 +206,28 @@
                                           '*)
                                     :initially 1)
                                   (rest body))))
+
+           (contains? form :assoc)
+           (do (check-form form #{:assoc :key} #{:by :into :if :initially})
+               (iter-expand (cons (merge
+                                   (dissoc form :assoc :key :by :initially)
+                                   {:reduce (:assoc form) 
+                                    :initially {}
+                                    :by (if (nil? (:by form))
+                                          `(fn [map# val#]
+                                             (assoc map# ~(:key form) val#))
+                                          (let [val-sym (gensym)]
+                                          `(fn [map# ~val-sym]
+                                             (let [key# ~(:key form)]
+                                               (assoc map#
+                                                 ~(:key form)
+                                                 (if (contains? map# key#)
+                                                   (~(:by form) (map# key#) ~val-sym)
+                                                   ~(if (:initially form)
+                                                      `(~(:by form) ~(:initially form) ~val-sym)
+                                                      val-sym)))))))})
+                                  (rest body))))
+                                   
            
 
            true
@@ -233,8 +253,9 @@
   "Utility to check the syntax of iter clauses"
   (iter {:for x :in required}
         (if (not (contains? form x))
-          (throw (Exception. (str form "does not contain the required keyword " x)))))
+          (throw (Exception. (str form " does not contain the required keyword " x)))))
   (iter {:for [key value] :in form}
         (if (and (not (contains? required key))
                  (not (contains? optional key)))
           (throw (Exception. (str form " contains the unknown keyword " key))))))
+

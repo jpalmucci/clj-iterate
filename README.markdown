@@ -99,35 +99,43 @@ any of the driver clauses reach their stopping criteria.
 
 Clj-iterate supports the following numeric driver clauses:
 
-        {:for var :from expr [:to expr] [:by expr] [:type type]} 
+####        {:for var :from expr [:to expr] [:by expr] [:type type]} 
 
 Iterates over the integers from the `:from` expr to the `:to` expr. If
 `:to` is missing, this clause will count forever.  If there is a 'by'
 clause increment by that amount on each iteration.
 
-        {:for var :downfrom expr [:to expr] [:by expr] [:type type]}
+####        {:for var :downfrom expr [:to expr] [:by expr] [:type type]}
 
 Same as the `:from` form, except we are counting down instead of
 up. Note: the `:by` expression must be negative (or absent) for the
 loop to terminate.
 
-        {:repeat n [:using var]}
+####        {:repeat n [:using var]}
 
 Repeat the loop `n` times. If the `using` option is present, expose
 the iteration variable by that name.
 
 ### Sequence Driver Clauses
 
-        {:for var :in expr}
+####        {:for var :in expr}
 
 Iterates over the sequence returned by `expr`, binding `var` to each
-element. 
+element. Destructuring is supported:
+
+        user> (iter {:for [key val] :in {1 2 3 4} } 
+                (println "Key" key "Val" val))
+              Key 1 Val 2
+              Key 3 Val 4
+              nil
+        user> 
+
 
 Note that there is no `:type` option for this clause because the items
 in the sequence are probably already boxed. Adding a type declaration
 would probably slow the loop down.
 
-        {:for var :on expr}
+####        {:for var :on expr}
 
 Iterates over successive subsequences of the sequence returned by
 `expr`, binding `var` to each subsequence.
@@ -158,21 +166,21 @@ Here is an example illustrating these options:
 
 Clj-iterate supports the following gatherer clauses:
 
-        {:sum expr [ :into var ] [ :if pred ] [:type type]}
+####        {:sum expr [ :into var ] [ :if pred ] [:type type]}
 
 Sum the `expr` over all loop iterations.
 
-        {:multiply expr [ :into var ] [ :if pred ] [:type type]}
+####        {:multiply expr [ :into var ] [ :if pred ] [:type type]}
 
 Mutiply the `expr` together. Return 1 if there are no values.
 
-        {:collect expr [ :into var ] [ :if pred ] }
+####        {:collect expr [ :into var ] [ :if pred ] }
 
 Collect `expr` into a sequence (specifically a persistent queue).
 
-        {:reduce expr :by fn  [:initially expr] [ :into var ] [ :if pred ] [:type type]}
+####        {:reduce expr :by reduce-fn [:initially expr] [ :into var ] [ :if pred ] [:type type]}
 
-Reduce the values returned by `expr` using `fn`. `Iter` mimics the
+Reduce the values returned by `expr` using `reduce-fn`. `Iter` mimics the
 clojure `reduce` function in that if zero values are reduced, the
 result is the function applied with no arguments.
 
@@ -193,9 +201,52 @@ function need not accept zero elements. Therefore, we could implement
 
 This is, in fact, how the `:sum` clause is implemented.
 
+#### {:assoc expr :key key [:by reduce-fn] [ :initially expr ] [ :into var ] [ :if pred ]}
+
+Create a map of the `expr` values indexed by `key`:
+
+        user> (iter {:for x :from 1 :to 10}
+                    {:assoc x :key x})
+              {1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7, 8 8, 9 9, 10 10}
+        user> 
+
+If `:by` is specified, use that function to reduce values with the same key:
+
+        user> (iter {:for x :from 1 :to 100}
+                    {:assoc (list x) :key (mod x 10) :by concat})
+        {0 (10 20 30 40 50 60 70 80 90 100),
+         1 (1 11 21 31 41 51 61 71 81 91),
+         2 (2 12 22 32 42 52 62 72 82 92),
+         3 (3 13 23 33 43 53 63 73 83 93),
+         4 (4 14 24 34 44 54 64 74 84 94),
+         5 (5 15 25 35 45 55 65 75 85 95),
+         6 (6 16 26 36 46 56 66 76 86 96),
+         7 (7 17 27 37 47 57 67 77 87 97),
+         8 (8 18 28 38 48 58 68 78 88 98),
+         9 (9 19 29 39 49 59 69 79 89 99)}
+        user> 
+
+If ':initially' is specified, use that as the initial value for the
+key-based reductions. For example, you could implement the above
+example, creating less garbage, like so:
+
+        user> (iter {:for x :from 1 :to 100}
+                    {:assoc x :key (mod x 10) :by conj :initially ()})
+        {0 (100 90 80 70 60 50 40 30 20 10),
+         1 (91 81 71 61 51 41 31 21 11 1),
+         2 (92 82 72 62 52 42 32 22 12 2),
+         3 (93 83 73 63 53 43 33 23 13 3),
+         4 (94 84 74 64 54 44 34 24 14 4),
+         5 (95 85 75 65 55 45 35 25 15 5),
+         6 (96 86 76 66 56 46 36 26 16 6),
+         7 (97 87 77 67 57 47 37 27 17 7),
+         8 (98 88 78 68 58 48 38 28 18 8),
+         9 (99 89 79 69 59 49 39 29 19 9)}
+        user> 
+
 ## Control Flow Clauses
 
-        {:return expr :if pred}
+####        {:return expr :if pred}
 
 If `pred` is true, immediately exit the loop returning `expr`.
 
@@ -214,7 +265,8 @@ If `pred` is true, immediately exit the loop returning `expr`.
             {:sum expr [ :into var ] [ :if pred ] [:type type]}
             {:multiply expr [ :into var ] [ :if pred ] [:type type]}
             {:collect expr [ :into var ] [ :if pred ]}
-            {:reduce expr :by fn  [ :initially expr ] [ :into var ] [ :if pred ]  [:type type]}
+            {:reduce expr :by reduce-fn  [ :initially expr ] [ :into var ] [ :if pred ]  [:type type]}
+            {:assoc expr :key key [:by reduce-fn] [ :initially expr ] [ :into var ] [ :if pred ]}
             {:returning expr}
 
 ### Control Flow
