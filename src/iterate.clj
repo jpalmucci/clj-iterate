@@ -208,6 +208,7 @@
                                   (rest body))))
 
            (contains? form :assoc)
+           ;; TODO: Make this a transient map because the iter loop is single threaded
            (do (check-form form #{:assoc :key} #{:by :into :if :initially})
                (iter-expand (cons (merge
                                    (dissoc form :assoc :key :by :initially)
