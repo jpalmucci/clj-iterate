@@ -174,6 +174,9 @@ Sum the `expr` over all loop iterations.
 
 Mutiply the `expr` together. Return 1 if there are no values.
 
+####        {:max expr [ :into var ] [ :if pred ] [:type type]}
+####        {:min expr [ :into var ] [ :if pred ] [:type type]}
+
 ####        {:collect expr [ :into var ] [ :if pred ] }
 
 Collect `expr` into a sequence (specifically a persistent queue).

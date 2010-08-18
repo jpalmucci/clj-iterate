@@ -197,6 +197,20 @@
                                     :initially 0)
                                   (rest body))))
 
+           (contains? form :max)
+           (do (check-form form #{:max} #{:into :if :type})
+               (iter-expand (cons (assoc (dissoc form :max)
+                                    :reduce (:max form)
+                                    :by 'max)
+                                  (rest body))))
+
+           (contains? form :min)
+           (do (check-form form #{:min} #{:into :if :type})
+               (iter-expand (cons (assoc (dissoc form :min)
+                                    :reduce (:min form)
+                                    :by 'min)
+                                  (rest body))))
+
            (contains? form :multiply)
            (do (check-form form #{:multiply} #{:into :if :type})
                (iter-expand (cons (assoc (dissoc form :multiply)
