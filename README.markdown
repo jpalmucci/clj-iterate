@@ -204,6 +204,10 @@ function need not accept zero elements. Therefore, we could implement
 
 This is, in fact, how the `sum` clause is implemented.
 
+#### {conj expr [ into var ] [ if pred ]}
+
+Collect the values into a set.
+
 #### {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
 
 Create a map of the `expr` values indexed by `key`:
@@ -253,6 +257,10 @@ example, creating less garbage, like so:
 
 If `pred` is true, immediately exit the loop returning `expr`.
 
+####        {for var = expr}
+
+Not really control flow. Defines a variable inside the loop body.
+
 ## Clause Quick Reference
 
 ### Drivers 
@@ -267,13 +275,17 @@ If `pred` is true, immediately exit the loop returning `expr`.
 
             {sum expr [ into var ] [ if pred ] [type type]}
             {multiply expr [ into var ] [ if pred ] [type type]}
+            {max expr [ into var ] [ if pred ] [type type]}
+            {min expr [ into var ] [ if pred ] [type type]}
             {collect expr [ into var ] [ if pred ]}
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
+            {conj expr [ into var ] [ if pred ]}
             {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
             {returning expr}
 
 ### Control Flow
 
             {return expr if pred}
+            {for var = expr}
 
 [1]: http://github.com/nathell/clj-iter

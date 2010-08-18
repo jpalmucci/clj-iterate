@@ -138,6 +138,15 @@
                {min x})
          1))
 
+  (is (= (iter {for x from 1 to 10}
+               {conj x})
+         #{1 2 3 4 5 6 7 8 9 10}))
+
+  (is (= (iter {for x from 1 to 10}
+               {for y = (+ 10 x)}
+               {conj y})
+         #{11 12 13 14 15 16 17 18 19 20}))
+
   (is (=
        (iter {for x from 1 to 100}
              {assoc (list x) key (mod x 10) by concat})

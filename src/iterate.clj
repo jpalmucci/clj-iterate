@@ -14,7 +14,7 @@
 ;; take the body of an iter and expand it into a map of the following items:
 ;; :initial - initial loop variable bindings in [var binding var binding .. ] form
 ;; :recur - recursion values for the :initial, in the same order
-;; :lets - variables computed based on current loop values that don't need to recur themselves
+;; :iteration-lets- - variables computed based on current loop values that don't need to recur themselves. calculated after the return tests
 ;; :return-val - the value to return when the looping terminates
 ;; :return-tests - a list of forms. if any eval to true, looping is finished
 ;; :code - code that should be evalled each time through the loop
@@ -42,6 +42,13 @@
                  :code `((if ~('if form)
                            ~('return form)
                            (do ~@(:code downstream)))))))
+
+           (subset? ['for '=] form-keys)
+           (do
+             (check-form form #{'for '=} #{})
+             (merge-with concat
+                         (iter-expand (rest body))
+                         {:iteration-lets `(~('for form) ~('= form))}))
 
            (contains? form 'repeat)
            (do
@@ -95,11 +102,11 @@
            (let [seq-var (gensym)]
              (check-form form #{'for 'in} #{})
              (merge-with concat 
-                         (iter-expand (rest body))
                          {:initial (list seq-var ('in form))
                           :recur `((next ~seq-var))
-                          :lets (list ('for form) `(first ~seq-var))
-                          :return-tests `((empty? ~seq-var))}))
+                          :iteration-lets (list ('for form) `(first ~seq-var))
+                          :return-tests `((empty? ~seq-var))}
+                         (iter-expand (rest body))))
 
            (subset? ['for 'on] form-keys)
            (do
@@ -242,8 +249,16 @@
                                                       `(~('by form) ~('initially form) ~val-sym)
                                                       val-sym)))))))})
                                   (rest body))))
-                                   
-           
+
+           (contains? form 'conj)
+           ;; TODO: Make this a transient map because the iter loop is single threaded
+           (do (check-form form #{'conj} #{'into 'if})
+               (iter-expand (cons (assoc
+                                   (dissoc form 'conj)
+                                   'reduce ('conj form) 
+                                   'initially #{}
+                                   'by 'conj)
+                                  (rest body))))
 
            true
            (throw (java.lang.Exception. (str "Unparsable iter form " form) ))))
@@ -259,9 +274,9 @@
         code (postwalk #(if (= % *recur-marker*) `(recur ~@(:recur parse)) %)
                        (:code parse))]
     `(loop ~(apply vector (:initial parse))
-       (let ~(apply vector (:lets parse))
-         (if (or ~@(:return-tests parse))
-           ~(:return-val parse)
+       (if (or ~@(:return-tests parse))
+         ~(:return-val parse)
+         (let ~(apply vector (:iteration-lets parse))
            (do ~@code))))))
 
 (defn- check-form [form required optional]
