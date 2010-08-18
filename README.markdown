@@ -9,9 +9,9 @@ The 'iter' macro takes a list of expressions. Lists are treated as
 clojure code to be executed inside the loop and maps are treated as
 iteration clauses.
 
-          user> (iter {:for x :from 1 :to 10}
+          user> (iter {for x from 1 to 10}
                       (println "On" x)
-                      {:collect x})
+                      {collect x})
           On 1
           On 2
           On 3
@@ -36,14 +36,14 @@ There are several different types of iteration clauses:
 
 For example:
 
-        user> (iter {:for x :from 1 :to 10}
-                    {:collect x :into y}
-                    {:return y :if (= x 5)})
+        user> (iter {for x from 1 to 10}
+                    {collect x into y}
+                    {return y if (= x 5)})
         (1 2 3 4 5)
         user> 
 
-`:For` is a driver clause, `:collect` is a gatherer clause, and
-`:return` is a flow control clause.
+`For` is a driver clause, `collect` is a gatherer clause, and
+`return` is a flow control clause.
 
 Driver clauses are declarative. They have the same effect no matter
 where they are placed in the iter form. Order is significant for the
@@ -51,34 +51,34 @@ other types of clauses.
 
 Example (compare to above):
 
-        user> (iter {:for x :from 1 :to 10}
-                    {:return y :if (= x 5)}
-                    {:collect x :into y})
+        user> (iter {for x from 1 to 10}
+                    {return y if (= x 5)}
+                    {collect x into y})
         (1 2 3 4)
         user> 
         
 Also:
 
-        user> (iter {:return y :if (= x 5)}
-                    {:collect x :into y}
-                    {:for x :from 1 :to 10})
+        user> (iter {return y if (= x 5)}
+                    {collect x into y}
+                    {for x from 1 to 10})
         (1 2 3 4)
         user> 
         
 ## Iteration Using Primitive Types
 
-Some clauses that introduce a new loop variable take a `:type`
+Some clauses that introduce a new loop variable take a `type`
 option. If given, the loop variable will be of that primitive type,
 making the code more efficient.
 
 For example:
 
-        user> (time (iter {:repeat 10000000}
-                          {:sum 1}))
+        user> (time (iter {repeat 10000000}
+                          {sum 1}))
         "Elapsed time: 421.595 msecs"
         10000000
-        user> (time (iter {:repeat 10000000}
-                          {:sum 1 :type int}))
+        user> (time (iter {repeat 10000000}
+                          {sum 1 type int}))
         "Elapsed time: 249.043 msecs"
         10000000
         user> 
@@ -88,9 +88,9 @@ For example:
 Driver clauses are all executed in parallel. The loop terminates when
 any of the driver clauses reach their stopping criteria.
 
-        user> (iter {:for x :from 1 :to 5}
-                    {:for y :downfrom 5 :to -100}
-                    {:collect [x y]})
+        user> (iter {for x from 1 to 5}
+                    {for y downfrom 5 to -100}
+                    {collect [x y]})
         ([1 5] [2 4] [3 3] [4 2] [5 1])
         user> 
 
@@ -99,31 +99,31 @@ any of the driver clauses reach their stopping criteria.
 
 Clj-iterate supports the following numeric driver clauses:
 
-####        {:for var :from expr [:to expr] [:by expr] [:type type]} 
+####        {for var from expr [to expr] [by expr] [type type]} 
 
-Iterates over the integers from the `:from` expr to the `:to` expr. If
-`:to` is missing, this clause will count forever.  If there is a 'by'
+Iterates over the integers from the `from` expr to the `to` expr. If
+`to` is missing, this clause will count forever.  If there is a 'by'
 clause increment by that amount on each iteration.
 
-####        {:for var :downfrom expr [:to expr] [:by expr] [:type type]}
+####        {for var downfrom expr [to expr] [by expr] [type type]}
 
-Same as the `:from` form, except we are counting down instead of
-up. Note: the `:by` expression must be negative (or absent) for the
+Same as the `from` form, except we are counting down instead of
+up. Note: the `by` expression must be negative (or absent) for the
 loop to terminate.
 
-####        {:repeat n [:using var]}
+####        {repeat n [using var]}
 
 Repeat the loop `n` times. If the `using` option is present, expose
 the iteration variable by that name.
 
 ### Sequence Driver Clauses
 
-####        {:for var :in expr}
+####        {for var in expr}
 
 Iterates over the sequence returned by `expr`, binding `var` to each
 element. Destructuring is supported:
 
-        user> (iter {:for [key val] :in {1 2 3 4} } 
+        user> (iter {for [key val] in {1 2 3 4} } 
                 (println "Key" key "Val" val))
               Key 1 Val 2
               Key 3 Val 4
@@ -131,57 +131,57 @@ element. Destructuring is supported:
         user> 
 
 
-Note that there is no `:type` option for this clause because the items
+Note that there is no `type` option for this clause because the items
 in the sequence are probably already boxed. Adding a type declaration
 would probably slow the loop down.
 
-####        {:for var :on expr}
+####        {for var on expr}
 
 Iterates over successive subsequences of the sequence returned by
 `expr`, binding `var` to each subsequence.
 
 ## Gatherer Clauses
 
-All gather clauses support two options: `:into` and `:if`.
+All gather clauses support two options: `into` and `if`.
 
-`:Into` is used to gather the results into a new loop variable. If a
-gatherer clause does not have an `:into` option, the values are
+`Into` is used to gather the results into a new loop variable. If a
+gatherer clause does not have an `into` option, the values are
 collected into a hidden variable which will be the return value of the
-iter expression. If more than one gather clause is missing the `:into`
+iter expression. If more than one gather clause is missing the `into`
 option, the results are undefined. If no gather clauses are missing
-the `:into` option, you can use the `:returning` clause to specify a value
+the `into` option, you can use the `returning` clause to specify a value
 to return at the end of the loop.
 
-If a gather clause has an `:if` option, the clause will only collect the
+If a gather clause has an `if` option, the clause will only collect the
 value if the provided expression is true.
 
 Here is an example illustrating these options:
 
-        user> (iter {:for x :from 0 :to 10}
-                    {:collect x :into evens :if (even? x)}
-                    {:collect x :into odds :if (odd? x)}
-                    {:returning [evens odds]})
+        user> (iter {for x from 0 to 10}
+                    {collect x into evens if (even? x)}
+                    {collect x into odds if (odd? x)}
+                    {returning [evens odds]})
         [(0 2 4 6 8 10) (1 3 5 7 9)]
         user> 
 
 Clj-iterate supports the following gatherer clauses:
 
-####        {:sum expr [ :into var ] [ :if pred ] [:type type]}
+####        {sum expr [ into var ] [ if pred ] [type type]}
 
 Sum the `expr` over all loop iterations.
 
-####        {:multiply expr [ :into var ] [ :if pred ] [:type type]}
+####        {multiply expr [ into var ] [ if pred ] [type type]}
 
 Mutiply the `expr` together. Return 1 if there are no values.
 
-####        {:max expr [ :into var ] [ :if pred ] [:type type]}
-####        {:min expr [ :into var ] [ :if pred ] [:type type]}
+####        {max expr [ into var ] [ if pred ] [type type]}
+####        {min expr [ into var ] [ if pred ] [type type]}
 
-####        {:collect expr [ :into var ] [ :if pred ] }
+####        {collect expr [ into var ] [ if pred ] }
 
 Collect `expr` into a sequence (specifically a persistent queue).
 
-####        {:reduce expr :by reduce-fn [:initially expr] [ :into var ] [ :if pred ] [:type type]}
+####        {reduce expr by reduce-fn [initially expr] [ into var ] [ if pred ] [type type]}
 
 Reduce the values returned by `expr` using `reduce-fn`. `Iter` mimics the
 clojure `reduce` function in that if zero values are reduced, the
@@ -190,33 +190,33 @@ result is the function applied with no arguments.
 For example, if `iter` did not have a sum clause you could implement
 it like this:
 
-        (iter {:for x :from 1 :to 10} 
-              {:reduce x :by +})
+        (iter {for x from 1 to 10} 
+              {reduce x by +})
 
-If you provide an initial value with `:initially`, that value is used
+If you provide an initial value with `initially`, that value is used
 as a starting point for the reduction. `Iter` can generate more
-efficient code with the `:initially` option, and the reduction
+efficient code with the `initially` option, and the reduction
 function need not accept zero elements. Therefore, we could implement
-`:sum` more efficiently as follows:
+`sum` more efficiently as follows:
 
-         (iter {:for x :from 1 :to 10} 
-               {:reduce x :by + :initially 0})
+         (iter {for x from 1 to 10} 
+               {reduce x by + initially 0})
 
-This is, in fact, how the `:sum` clause is implemented.
+This is, in fact, how the `sum` clause is implemented.
 
-#### {:assoc expr :key key [:by reduce-fn] [ :initially expr ] [ :into var ] [ :if pred ]}
+#### {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
 
 Create a map of the `expr` values indexed by `key`:
 
-        user> (iter {:for x :from 1 :to 10}
-                    {:assoc x :key x})
+        user> (iter {for x from 1 to 10}
+                    {assoc x key x})
               {1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7, 8 8, 9 9, 10 10}
         user> 
 
-If `:by` is specified, use that function to reduce values with the same key:
+If `by` is specified, use that function to reduce values with the same key:
 
-        user> (iter {:for x :from 1 :to 100}
-                    {:assoc (list x) :key (mod x 10) :by concat})
+        user> (iter {for x from 1 to 100}
+                    {assoc (list x) key (mod x 10) by concat})
         {0 (10 20 30 40 50 60 70 80 90 100),
          1 (1 11 21 31 41 51 61 71 81 91),
          2 (2 12 22 32 42 52 62 72 82 92),
@@ -229,12 +229,12 @@ If `:by` is specified, use that function to reduce values with the same key:
          9 (9 19 29 39 49 59 69 79 89 99)}
         user> 
 
-If ':initially' is specified, use that as the initial value for the
+If 'initially' is specified, use that as the initial value for the
 key-based reductions. For example, you could implement the above
 example, creating less garbage, like so:
 
-        user> (iter {:for x :from 1 :to 100}
-                    {:assoc x :key (mod x 10) :by conj :initially ()})
+        user> (iter {for x from 1 to 100}
+                    {assoc x key (mod x 10) by conj initially ()})
         {0 (100 90 80 70 60 50 40 30 20 10),
          1 (91 81 71 61 51 41 31 21 11 1),
          2 (92 82 72 62 52 42 32 22 12 2),
@@ -249,7 +249,7 @@ example, creating less garbage, like so:
 
 ## Control Flow Clauses
 
-####        {:return expr :if pred}
+####        {return expr if pred}
 
 If `pred` is true, immediately exit the loop returning `expr`.
 
@@ -257,23 +257,23 @@ If `pred` is true, immediately exit the loop returning `expr`.
 
 ### Drivers 
 
-            {:for var :from expr [:to expr] [:by expr] [:type type]} 
-            {:for var :downfrom expr [:to expr] [:by expr] [:type type]}
-            {:repeat n [:using var]}        
-            {:for var :in expr}
-            {:for var :on expr}
+            {for var from expr [to expr] [by expr] [type type]} 
+            {for var downfrom expr [to expr] [by expr] [type type]}
+            {repeat n [using var]}        
+            {for var in expr}
+            {for var on expr}
 
 ### Gatherers
 
-            {:sum expr [ :into var ] [ :if pred ] [:type type]}
-            {:multiply expr [ :into var ] [ :if pred ] [:type type]}
-            {:collect expr [ :into var ] [ :if pred ]}
-            {:reduce expr :by reduce-fn  [ :initially expr ] [ :into var ] [ :if pred ]  [:type type]}
-            {:assoc expr :key key [:by reduce-fn] [ :initially expr ] [ :into var ] [ :if pred ]}
-            {:returning expr}
+            {sum expr [ into var ] [ if pred ] [type type]}
+            {multiply expr [ into var ] [ if pred ] [type type]}
+            {collect expr [ into var ] [ if pred ]}
+            {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
+            {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
+            {returning expr}
 
 ### Control Flow
 
-            {:return expr :if pred}
+            {return expr if pred}
 
 [1]: http://github.com/nathell/clj-iter
