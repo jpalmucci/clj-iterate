@@ -89,7 +89,7 @@
                                  'initially (if (not (nil? ('type form)))
                                               `(~('type form) ~('from form))
                                               ('from form))
-                                 'then (if (contains? #{'int 'long} ('type form))
+                                 'then (if (contains? #{'int 'long 'float 'double} ('type form))
                                          `(+ ~('for form) (~('type form) ~(or ('by form) 1)))
                                          (if (nil? ('by form))
                                            `(inc ~('for form))
@@ -266,14 +266,22 @@
                                   (rest body))))
 
            (contains? form 'conj)
-           ;; TODO: Make this a transient map because the iter loop is single threaded
            (do (check-form form #{'conj} #{'into 'if})
                (iter-expand (cons (assoc
                                    (dissoc form 'conj)
                                    'reduce ('conj form) 
                                    'initially '(transient #{})
-                                   'post `(fn [x#] (persistent! x#))
+                                   'post '(fn [x] (persistent! x))
                                    'by 'conj!)
+                                  (rest body))))
+
+           (contains? form 'merge)
+           (do (check-form form #{'merge} #{'into 'if})
+               (iter-expand (cons (assoc
+                                   (dissoc form 'merge)
+                                   'reduce ('merge form) 
+                                   'initially '{}
+                                   'by 'merge)
                                   (rest body))))
 
            true

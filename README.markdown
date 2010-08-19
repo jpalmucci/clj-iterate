@@ -245,6 +245,11 @@ example, creating less garbage, like so:
          9 (99 89 79 69 59 49 39 29 19 9)}
         user> 
 
+#### {merge expr [ into var ] [ if pred ]}
+
+Expr should return a map. All maps are merged together with later
+iterations taking priority.
+
 ## Control Flow Clauses
 
 ####        {return-if pred}
@@ -276,6 +281,7 @@ Not really control flow. Defines a variable inside the loop body.
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
             {conj expr [ into var ] [ if pred ]}
             {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
+            {merge expr [ into var ] [ if pred ]}
             {returning expr}
 
 ### Control Flow
