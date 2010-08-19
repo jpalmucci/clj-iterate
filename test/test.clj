@@ -36,11 +36,13 @@
                {returning [y]})
          [(+ 0 1 2 3 4 5 6 7 8 9 10)]))
 
+  #_
   (is (= (iter {for x from 0 to 10}
                {sum x}
                {return :foo if (= x 5)})
          :foo))
 
+  #_
   (is (= (iter {for x from 0 to 10}
                {sum x}
                {return :foo if (= x 50)})
@@ -147,7 +149,7 @@
                {conj y})
          #{11 12 13 14 15 16 17 18 19 20}))
 
-  (is (=
+  (is (= 
        (iter {for x from 1 to 100}
              {assoc (list x) key (mod x 10) by concat})
        '{0 (10 20 30 40 50 60 70 80 90 100),

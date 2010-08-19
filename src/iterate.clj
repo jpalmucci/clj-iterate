@@ -16,7 +16,8 @@
 ;; :recur - recursion values for the :initial, in the same order
 ;; :iteration-lets- - variables computed based on current loop values that don't need to recur themselves. calculated after the return tests
 ;; :return-val - the value to return when the looping terminates
-;; :return-tests - a list of forms. if any eval to true, looping is finished
+;; :return-tests - a list of predicates. if any eval to true, looping is finished
+;; :post - a list of var form pair that should be applied to the variable before returning
 ;; :code - code that should be evalled each time through the loop
 (defn iter-expand [body]
   (cond (empty? body)
@@ -33,15 +34,6 @@
              (check-form form #{'returning} #{})
              (assoc (iter-expand (rest body))
                :return-val ('returning form)))
-
-           (contains? form 'return)
-           (do
-             (check-form form #{'return 'if} #{})
-             (let [downstream (iter-expand (rest body))]
-               (assoc downstream
-                 :code `((if ~('if form)
-                           ~('return form)
-                           (do ~@(:code downstream)))))))
 
            (subset? ['for '=] form-keys)
            (do
@@ -90,12 +82,12 @@
                                               `(~('type form) ~('from form))
                                               ('from form))
                                  'then (if (contains? #{'int 'long} ('type form))
-                                         `(unchecked-add ~('for form)  ~(or ('by form) 1))
+                                         `(+ ~('for form) (~('type form) ~(or ('by form) 1)))
                                          (if (nil? ('by form))
                                            `(inc ~('for form))
                                            (if (nil? ('type form))
-                                             `(+  ~('for form)  ~('by form))
-                                             `(~('type form)  (+  ~('for form)  ~('by form))))))}
+                                             `(+ ~('for form)  ~('by form))
+                                             `(~('type form)  (+ ~('for form)  ~('by form))))))}
                                 (rest body))))
 
            (subset? ['for 'in] form-keys)
@@ -129,7 +121,7 @@
            ;; reduce case with 'initially
            (subset? ['reduce 'into 'initially] form-keys)
            (do
-             (check-form form #{'reduce 'by 'into 'initially} #{'if 'type})
+             (check-form form #{'reduce 'by 'into 'initially} #{'if 'type 'post})
              (let [downstream (iter-expand (rest body))
                    new-value-code (if (nil? ('if form))
                                                       `(~('by form) ~('into form) ~('reduce form))
@@ -145,6 +137,9 @@
                                                       ('into form)
                                                       `(~('type form) ~('into form)))
                                     (:recur downstream))
+                       :post (if ('post form)
+                               `(~('into form) (~('post form) ~('into form))  ~@(:post downstream))
+                               (:post downstream))
                        :code `((let [~('into form) ~(if (nil? ('type form))
                                                       new-value-code
                                                       `(~('type form) ~new-value-code))]
@@ -152,7 +147,7 @@
 
            (subset? ['reduce 'initially] form-keys)
            (do
-             (check-form form #{'reduce 'by 'initially} #{'if 'type})
+             (check-form form #{'reduce 'by 'initially} #{'if 'type 'post})
              (let [out-var (gensym)
                    downstream (iter-expand (cons (assoc form 'into out-var) (rest body)))]
                (assoc downstream :return-val out-var :return-val out-var)))
@@ -191,7 +186,8 @@
                (iter-expand (cons (assoc (dissoc form 'collect)
                                     'reduce ('collect form)
                                     'by 'conj
-                                    'initially '(clojure.lang.PersistentQueue/EMPTY))
+                                    'initially '(clojure.lang.PersistentQueue/EMPTY)
+                                    'post '(fn [x] (seq x)))
                                   (rest body))))
 
            (contains? form 'sum)
@@ -203,6 +199,18 @@
                                           '+)
                                     'initially 0)
                                   (rest body))))
+
+           (contains? form 'mean)
+           (do (check-form form #{'mean} #{'if})
+               (let [count (gensym) sum (gensym)]
+                 (merge-with concat
+                             {:initial (list count '(int 0) sum '(double 0))
+                              :recur (if ('if form)
+                                       `((if ~('if form) (inc ~count) ~count)
+                                         (if ~('if form) (double (+ ~sum ~('mean form))) ~sum))
+                                       `((inc ~count) (double (+ ~sum ~('mean form)))))}
+                             (assoc (iter-expand (rest body))
+                               :return-val `(/ ~sum ~count)))))
 
            (contains? form 'max)
            (do (check-form form #{'max} #{'into 'if 'type})
@@ -234,20 +242,23 @@
                (iter-expand (cons (merge
                                    (dissoc form 'assoc 'key 'by 'initially)
                                    {'reduce ('assoc form) 
-                                    'initially {}
+                                    'initially '(transient {})
+                                    'post '(fn [x] (persistent! x))
                                     'by (if (nil? ('by form))
                                           `(fn [map# val#]
-                                             (assoc map# ~('key form) val#))
+                                             (assoc! map# ~('key form) val#))
                                           (let [val-sym (gensym)]
-                                          `(fn [map# ~val-sym]
-                                             (let [key# ~('key form)]
-                                               (assoc map#
-                                                 ~('key form)
-                                                 (if (contains? map# key#)
-                                                   (~('by form) (map# key#) ~val-sym)
-                                                   ~(if ('initially form)
-                                                      `(~('by form) ~('initially form) ~val-sym)
-                                                      val-sym)))))))})
+                                            `(fn [map# ~val-sym]
+                                               (let [key# ~('key form)]
+                                                 (assoc! map# key#
+                                                         (if (not (nil? (map# key#)))
+                                                           ;; work around the contains? bug
+                                                           ;; TODO take out, won't work when you store a nil
+                                                           ;; (contains? map# key#)
+                                                           (~('by form) (map# key#) ~val-sym)
+                                                           ~(if ('initially form)
+                                                              `(~('by form) ~('initially form) ~val-sym)
+                                                              val-sym)))))))})
                                   (rest body))))
 
            (contains? form 'conj)
@@ -256,8 +267,9 @@
                (iter-expand (cons (assoc
                                    (dissoc form 'conj)
                                    'reduce ('conj form) 
-                                   'initially #{}
-                                   'by 'conj)
+                                   'initially '(transient #{})
+                                   'post `(fn [x#] (persistent! x#))
+                                   'by 'conj!)
                                   (rest body))))
 
            true
@@ -271,11 +283,13 @@
 
 (defmacro iter [& body]
   (let [parse (iter-expand body)
-        code (postwalk #(if (= % *recur-marker*) `(recur ~@(:recur parse)) %)
+        code (postwalk #(cond (= % *recur-marker*) `(recur ~@(:recur parse))
+                              true %)
                        (:code parse))]
     `(loop ~(apply vector (:initial parse))
        (if (or ~@(:return-tests parse))
-         ~(:return-val parse)
+         (let ~(apply vector (:post parse))
+           ~(:return-val parse))
          (let ~(apply vector (:iteration-lets parse))
            (do ~@code))))))
 
