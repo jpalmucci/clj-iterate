@@ -36,16 +36,14 @@
                {returning [y]})
          [(+ 0 1 2 3 4 5 6 7 8 9 10)]))
 
-  #_
   (is (= (iter {for x from 0 to 10}
                {sum x}
-               {return :foo if (= x 5)})
-         :foo))
+               {return-if (= x 5)})
+         (+ 0 1 2 3 4)))
 
-  #_
   (is (= (iter {for x from 0 to 10}
                {sum x}
-               {return :foo if (= x 50)})
+               {return-if (= x 50)})
          (+ 0 1 2 3 4 5 6 7 8 9 10)))
 
   (is (= (iter {for x from 1 to 10}

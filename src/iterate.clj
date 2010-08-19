@@ -29,6 +29,14 @@
               form-keys (set (keys form))]
           (cond                   
 
+           (contains? form 'return-if)
+           (do
+             (check-form form #{'return-if} #{})
+             (let [downstream (iter-expand (rest body))]
+               (assoc downstream
+                 :return-tests
+                 (cons ('return-if form) (downstream :return-tests)))))
+
            (contains? form 'returning)
            (do
              (check-form form #{'returning} #{})
@@ -134,16 +142,12 @@
                                                       `(~('type form) ~('initially form)))
                                        (:initial downstream))
                        :recur (cons (if (nil? ('type form))
-                                                      ('into form)
-                                                      `(~('type form) ~('into form)))
+                                      new-value-code
+                                                      `(~('type form) ~new-value-code))
                                     (:recur downstream))
                        :post (if ('post form)
                                `(~('into form) (~('post form) ~('into form))  ~@(:post downstream))
-                               (:post downstream))
-                       :code `((let [~('into form) ~(if (nil? ('type form))
-                                                      new-value-code
-                                                      `(~('type form) ~new-value-code))]
-                                 ~@(:code downstream)))})))
+                               (:post downstream))})))
 
            (subset? ['reduce 'initially] form-keys)
            (do
@@ -291,7 +295,7 @@
          (let ~(apply vector (:post parse))
            ~(:return-val parse))
          (let ~(apply vector (:iteration-lets parse))
-           (do ~@code))))))
+           ~@code)))))
 
 (defn- check-form [form required optional]
   "Utility to check the syntax of iter clauses"

@@ -37,33 +37,26 @@ There are several different types of iteration clauses:
 For example:
 
         user> (iter {for x from 1 to 10}
-                    {collect x into y}
-                    {return y if (= x 5)})
-        (1 2 3 4 5)
+                    {return-if (= x 5)}
+                    {collect x})
+        (1 2 3 4)
         user> 
 
 `For` is a driver clause, `collect` is a gatherer clause, and
 `return` is a flow control clause.
 
-Driver clauses are declarative. They have the same effect no matter
-where they are placed in the iter form. Order is significant for the
-other types of clauses. 
+Clauses are declarative. They have the same effect no matter where
+they are placed in the iter form. Updates and tests occur in lockstep.
 
-Example (compare to above):
+Therefore:
 
         user> (iter {for x from 1 to 10}
-                    {return y if (= x 5)}
-                    {collect x into y})
+                    {collect x}
+                    {return-if (= x 5)})
         (1 2 3 4)
         user> 
-        
-Also:
 
-        user> (iter {return y if (= x 5)}
-                    {collect x into y}
-                    {for x from 1 to 10})
-        (1 2 3 4)
-        user> 
+Order is significant for clojure code, of course.
         
 ## Iteration Using Primitive Types
 
@@ -176,6 +169,7 @@ Mutiply the `expr` together. Return 1 if there are no values.
 
 ####        {max expr [ into var ] [ if pred ] [type type]}
 ####        {min expr [ into var ] [ if pred ] [type type]}
+####        {mean expr [ if pred ]}
 
 ####        {collect expr [ into var ] [ if pred ] }
 
@@ -253,9 +247,9 @@ example, creating less garbage, like so:
 
 ## Control Flow Clauses
 
-####        {return expr if pred}
+####        {return-if pred}
 
-If `pred` is true, immediately exit the loop returning `expr`.
+If `pred` is true, immediately exit the loop..
 
 ####        {for var = expr}
 
@@ -277,6 +271,7 @@ Not really control flow. Defines a variable inside the loop body.
             {multiply expr [ into var ] [ if pred ] [type type]}
             {max expr [ into var ] [ if pred ] [type type]}
             {min expr [ into var ] [ if pred ] [type type]}
+            {mean expr [ if pred ]}
             {collect expr [ into var ] [ if pred ]}
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
             {conj expr [ into var ] [ if pred ]}
@@ -285,7 +280,7 @@ Not really control flow. Defines a variable inside the loop body.
 
 ### Control Flow
 
-            {return expr if pred}
+            {return-if pred}
             {for var = expr}
 
 [1]: http://github.com/nathell/clj-iter
