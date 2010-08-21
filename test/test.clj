@@ -189,4 +189,16 @@
                   {x (+ x 1)}})
            {1 2 2 3 3 4 4 5 5 6}))
 
+    (is (= (iter {for x downfrom 10 to 5}
+                 {min x by compare})
+           5))
+    
+    (is (= (iter {for x downfrom 10 to 5}
+                 {max x by compare})
+           10))
+    
+    (is (= (iter {for x in []}
+                 {max x})
+           nil))
+
   )

@@ -163,26 +163,27 @@
              (let [downstream (iter-expand (rest body))]
                (assoc downstream
                  :initial (list* ('into form) '*reduce-marker* (:initial downstream))
-                 :recur (cons ('into form) (:recur downstream))
-                 :code `((let [~('into form) ~(if (nil? ('if form))
-                                                `(cond (= ~('into form) *reduce-marker*)
-                                                       ~('reduce form)
-                                                       true
-                                                       (~('by form) ~('into form) ~('reduce form)))
-                                                `(cond (not ~('if form))
-                                                       ~('into form)
-                                                       (= ~('into form) *reduce-marker*)
-                                                       ~('reduce form)
-                                                       true
-                                                       (~('by form) ~('into form) ~('reduce form))))]
-                           (do ~@(:code downstream)))))))
+                 :recur (cons (if (nil? ('if form))
+                                `(cond (= ~('into form) *reduce-marker*)
+                                       ~('reduce form)
+                                       true
+                                       (~('by form) ~('into form) ~('reduce form)))
+                                `(cond (not ~('if form))
+                                       ~('into form)
+                                       (= ~('into form) *reduce-marker*)
+                                       ~('reduce form)
+                                       true
+                                       (~('by form) ~('into form) ~('reduce form)))) (:recur downstream)))))
 
            (contains? form 'reduce)
-           (let [into-var (gensym)]
+           ;; reduce without into, no intitially
+           (let [into-var (gensym)
+                 downstream (iter-expand (cons (assoc form 'into into-var)
+                                       (rest body)))]
              (check-form form #{'reduce 'by} #{'if 'type})
-             (assoc (iter-expand (cons (assoc form 'into into-var)
-                                       (rest body)))
-               :return-val into-var))
+             (assoc downstream
+               :return-val into-var
+               :post (list* into-var `(if (= ~into-var *reduce-marker*) nil ~into-var) (:post downstream))))
 
 
            (contains? form 'collect)
@@ -217,17 +218,29 @@
                                :return-val `(/ ~sum ~count)))))
 
            (contains? form 'max)
-           (do (check-form form #{'max} #{'into 'if 'type})
+           (do (check-form form #{'max} #{'into 'if 'type 'by})
                (iter-expand (cons (assoc (dissoc form 'max)
                                     'reduce ('max form)
-                                    'by 'max)
+                                    'by (if ('by form)
+                                          `(fn [a# b#]
+                                             (if (> (.compare ^java.util.Comparator ~('by form) a# b#) 0)
+                                               a#
+                                               b#))
+                                                                
+                                          'max))
                                   (rest body))))
 
            (contains? form 'min)
-           (do (check-form form #{'min} #{'into 'if 'type})
-               (iter-expand (cons (assoc (dissoc form 'min)
+           (do (check-form form #{'min} #{'into 'if 'type 'by})
+               (iter-expand (cons (assoc (dissoc form 'min 'by)
                                     'reduce ('min form)
-                                    'by 'min)
+                                    'by (if ('by form)
+                                          `(fn [a# b#]
+                                             (if (< (.compare ^java.util.Comparator ~('by form) a# b#) 0)
+                                               a#
+                                               b#))
+                                                                
+                                          'min))
                                   (rest body))))
 
            (contains? form 'multiply)

@@ -167,8 +167,8 @@ Sum the `expr` over all loop iterations.
 
 Mutiply the `expr` together. Return 1 if there are no values.
 
-####        {max expr [ into var ] [ if pred ] [type type]}
-####        {min expr [ into var ] [ if pred ] [type type]}
+####        {max expr [ into var ] [ if pred ] [type type] [by comparator]}
+####        {min expr [ into var ] [ if pred ] [type type] [by comparator]}
 ####        {mean expr [ if pred ]}
 
 ####        {collect expr [ into var ] [ if pred ] }
@@ -274,8 +274,8 @@ Not really control flow. Defines a variable inside the loop body.
 
             {sum expr [ into var ] [ if pred ] [type type]}
             {multiply expr [ into var ] [ if pred ] [type type]}
-            {max expr [ into var ] [ if pred ] [type type]}
-            {min expr [ into var ] [ if pred ] [type type]}
+            {max expr [ into var ] [ if pred ] [type type] [by comparator]}
+            {min expr [ into var ] [ if pred ] [type type] [by comparator]}
             {mean expr [ if pred ]}
             {collect expr [ into var ] [ if pred ]}
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
