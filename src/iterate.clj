@@ -47,8 +47,8 @@
            (do
              (check-form form #{'for '=} #{})
              (merge-with concat
-                         (iter-expand (rest body))
-                         {:iteration-lets `(~('for form) ~('= form))}))
+                         {:iteration-lets `(~('for form) ~('= form))}
+                         (iter-expand (rest body))))
 
            (contains? form 'repeat)
            (do
@@ -154,7 +154,8 @@
              (check-form form #{'reduce 'by 'initially} #{'if 'type 'post})
              (let [out-var (gensym)
                    downstream (iter-expand (cons (assoc form 'into out-var) (rest body)))]
-               (assoc downstream :return-val out-var :return-val out-var)))
+               (assoc downstream
+                 :return-val out-var)))
 
            ;; reduce case without 'initially
            (subset? ['reduce 'into] form-keys)
