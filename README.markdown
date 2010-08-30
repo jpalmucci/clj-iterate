@@ -171,9 +171,11 @@ Mutiply the `expr` together. Return 1 if there are no values.
 ####        {min expr [ into var ] [ if pred ] [type type] [by comparator]}
 ####        {mean expr [ if pred ]}
 
-####        {collect expr [ into var ] [ if pred ] }
+####        {collect expr [ into var ] [ if pred ] [initially expr]}
 
-Collect `expr` into a sequence (specifically a persistent queue).
+Collect `expr` into a sequence (specifically a persistent
+queue). Optionally start with the collect specified by the `initially`
+option, which can by any data structure that supports conj.
 
 ####        {reduce expr by reduce-fn [initially expr] [ into var ] [ if pred ] [type type]}
 
@@ -277,7 +279,7 @@ Not really control flow. Defines a variable inside the loop body.
             {max expr [ into var ] [ if pred ] [type type] [by comparator]}
             {min expr [ into var ] [ if pred ] [type type] [by comparator]}
             {mean expr [ if pred ]}
-            {collect expr [ into var ] [ if pred ]}
+            {collect expr [ into var ] [ if pred ] [initially expr]}
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
             {conj expr [ into var ] [ if pred ]}
             {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}

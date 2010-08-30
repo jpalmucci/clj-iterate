@@ -8,9 +8,6 @@
 ;; used to represent a reduction with zero items in it
 (defonce *reduce-marker* (Object.))
 
-;; used to mark the place in the form where we want the recur to occur
-(defonce *recur-marker* (Object.))
-
 ;; take the body of an iter and expand it into a map of the following items:
 ;; :initial - initial loop variable bindings in [var binding var binding .. ] form
 ;; :recur - recursion values for the :initial, in the same order
@@ -21,7 +18,7 @@
 ;; :code - code that should be evalled each time through the loop
 (defn iter-expand [body]
   (cond (empty? body)
-        {:initial () :recur () :code (list *recur-marker*) :return-tests ()}
+        {:initial () :recur () :code nil :return-tests ()}
 
         (map? (first body))
         ;; we have a map, which means it is an iteration clause
@@ -188,11 +185,13 @@
 
 
            (contains? form 'collect)
-           (do (check-form form #{'collect} #{'into 'if 'type})
+           (do (check-form form #{'collect} #{'into 'if 'type 'initially})
                (iter-expand (cons (assoc (dissoc form 'collect)
                                     'reduce ('collect form)
                                     'by 'conj
-                                    'initially '(clojure.lang.PersistentQueue/EMPTY)
+                                    'initially (if (contains? form 'initially)
+                                                 (form 'initially)
+                                                 '(clojure.lang.PersistentQueue/EMPTY))
                                     'post '(fn [x] (seq x)))
                                   (rest body))))
 
@@ -273,7 +272,7 @@
                                                            ;; work around the contains? bug
                                                            ;; TODO take out, won't work when you store a nil
                                                            ;; (contains? map# key#)
-                                                           (~('by form) (map# key#) ~val-sym)
+                                                           (~('by form) (get map# key#) ~val-sym)
                                                            ~(if ('initially form)
                                                               `(~('by form) ~('initially form) ~val-sym)
                                                               val-sym)))))))})
@@ -308,16 +307,15 @@
                     (iter-expand (rest body)))))
 
 (defmacro iter [& body]
-  (let [parse (iter-expand body)
-        code (postwalk #(cond (= % *recur-marker*) `(recur ~@(:recur parse))
-                              true %)
-                       (:code parse))]
+  (let [parse (iter-expand body)]
     `(loop ~(apply vector (:initial parse))
-       (if (or ~@(:return-tests parse))
-         (let ~(apply vector (:post parse))
-           ~(:return-val parse))
-         (let ~(apply vector (:iteration-lets parse))
-           ~@code)))))
+       (cond (or ~@(:return-tests parse))
+             (let ~(apply vector (:post parse))
+               ~(:return-val parse))
+             true
+             (let ~(apply vector (:iteration-lets parse))
+               ~@(:code parse)
+               (recur ~@(:recur parse)))))))
 
 (defn- check-form [form required optional]
   "Utility to check the syntax of iter clauses"
