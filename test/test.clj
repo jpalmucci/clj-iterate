@@ -3,6 +3,18 @@
   (:use iterate))
 
 (deftest iter-test
+  (is (= (iter {for x from 0 to 5}
+               {collect x})
+         [0 1 2 3 4 5]))
+
+  ;; check to make sure user code is running
+  (is (= (let [gotit (atom false)]
+           (iter {for x from 0 to 5}
+                 {collect x}
+                 (reset! gotit true))
+           @gotit)
+         true))
+
   (is (= (iter {for x from 0 to 10}
                {collect x if (even? x)})
          [0 2 4 6 8 10]))
@@ -175,8 +187,8 @@
          8 (98 88 78 68 58 48 38 28 18 8),
          9 (99 89 79 69 59 49 39 29 19 9)}))
 
-    (is (=
-         (iter {for x from 1 to 100}
+  (is (=
+       (iter {for x from 1 to 100}
              {assoc x key (mod x 10) by conj if (even? x) initially ()})
        '{0 (100 90 80 70 60 50 40 30 20 10),
          2 (92 82 72 62 52 42 32 22 12 2),
@@ -184,21 +196,21 @@
          6 (96 86 76 66 56 46 36 26 16 6),
          8 (98 88 78 68 58 48 38 28 18 8)}))
 
-    (is (= (iter {for x from 1 to 5}
-                 {merge
-                  {x (+ x 1)}})
-           {1 2 2 3 3 4 4 5 5 6}))
+  (is (= (iter {for x from 1 to 5}
+               {merge
+                {x (+ x 1)}})
+         {1 2 2 3 3 4 4 5 5 6}))
 
-    (is (= (iter {for x downfrom 10 to 5}
-                 {min x by compare})
-           5))
-    
-    (is (= (iter {for x downfrom 10 to 5}
-                 {max x by compare})
-           10))
-    
-    (is (= (iter {for x in []}
-                 {max x})
-           nil))
+  (is (= (iter {for x downfrom 10 to 5}
+               {min x by compare})
+         5))
+  
+  (is (= (iter {for x downfrom 10 to 5}
+               {max x by compare})
+         10))
+  
+  (is (= (iter {for x in []}
+               {max x})
+         nil))
 
   )
