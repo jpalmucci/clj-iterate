@@ -288,6 +288,15 @@
                                    'by 'conj!)
                                   (rest body))))
 
+           (subset? '(merge by) form-keys)
+           (do (check-form form '#{merge by} '#{into if})
+               (iter-expand (cons (assoc
+                                      (dissoc form 'merge 'by)
+                                    'reduce ('merge form) 
+                                    'initially '{}
+                                    'by `(fn [x# y#] (merge-with ~(form 'by) x# y#)))
+                                  (rest body))))
+           
            (contains? form 'merge)
            (do (check-form form #{'merge} #{'into 'if})
                (iter-expand (cons (assoc

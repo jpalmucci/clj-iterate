@@ -247,10 +247,15 @@ example, creating less garbage, like so:
          9 (99 89 79 69 59 49 39 29 19 9)}
         user> 
 
-#### {merge expr [ into var ] [ if pred ]}
+#### {merge expr [by fn] [ into var ] [ if pred ]}
 
-Expr should return a map. All maps are merged together with later
-iterations taking priority.
+Expr should return a map. All maps are merged, as in the clojure merge
+function. 
+
+Keys that occur in more than one map are combined using the function
+specified in the `by` option, which must take 2 arguments. If the `by`
+option is not specified, entries in later iterations overwrite
+previous iterations.
 
 ## Control Flow Clauses
 
@@ -283,7 +288,7 @@ Not really control flow. Defines a variable inside the loop body.
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
             {conj expr [ into var ] [ if pred ]}
             {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
-            {merge expr [ into var ] [ if pred ]}
+            {merge expr [ by fn ] [ into var ] [ if pred ]}
             {returning expr}
 
 ### Control Flow

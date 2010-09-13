@@ -201,6 +201,11 @@
                 {x (+ x 1)}})
          {1 2 2 3 3 4 4 5 5 6}))
 
+  (is (= (iter {for x from 1 to 5}
+               {merge {1 x}
+                by +})
+         {1 (+ 1 2 3 4 5)}))
+
   (is (= (iter {for x downfrom 10 to 5}
                {min x by compare})
          5))
