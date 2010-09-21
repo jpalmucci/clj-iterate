@@ -7,6 +7,10 @@
                {collect x})
          [0 1 2 3 4 5]))
 
+  (is (= (iter {for x from 0 to 5 type int}
+               {collect x})
+         [0 1 2 3 4 5]))
+
   ;; check to make sure user code is running
   (is (= (let [gotit (atom false)]
            (iter {for x from 0 to 5}

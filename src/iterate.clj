@@ -12,6 +12,7 @@
 ;; :initial - initial loop variable bindings in [var binding var binding .. ] form
 ;; :recur - recursion values for the :initial, in the same order
 ;; :iteration-lets- - variables computed based on current loop values that don't need to recur themselves. calculated after the return tests
+;; :lets- - variables computed and bound outside the loop
 ;; :return-val - the value to return when the looping terminates
 ;; :return-tests - a list of predicates. if any eval to true, looping is finished
 ;; :post - a list of var form pair that should be applied to the variable before returning
@@ -59,7 +60,11 @@
            (subset? ['for 'from 'to] form-keys)
            (merge-with concat
                        (iter-expand (cons (dissoc form 'to) (rest body)))
-                       {:return-tests `((> ~('for form) ~('to form)))})
+                       (let [var (gensym)]
+                         {:lets (if (form 'type)
+                                  `(~var (~(form 'type) ~(form 'to)))
+                                  `(~var ~(form 'to)))
+                          :return-tests `((> ~('for form) ~var))}))
 
            (subset? ['for 'downfrom 'to] form-keys)
            (do
@@ -140,7 +145,7 @@
                                        (:initial downstream))
                        :recur (cons (if (nil? ('type form))
                                       new-value-code
-                                                      `(~('type form) ~new-value-code))
+                                      `(~('type form) ~new-value-code))
                                     (:recur downstream))
                        :post (if ('post form)
                                `(~('into form) (~('post form) ~('into form))  ~@(:post downstream))
@@ -254,7 +259,6 @@
                                   (rest body))))
 
            (contains? form 'assoc)
-           ;; TODO: Make this a transient map because the iter loop is single threaded
            (do (check-form form #{'assoc 'key} #{'by 'into 'if 'initially})
                (iter-expand (cons (merge
                                    (dissoc form 'assoc 'key 'by 'initially)
@@ -268,7 +272,7 @@
                                             `(fn [map# ~val-sym]
                                                (let [key# ~('key form)]
                                                  (assoc! map# key#
-                                                         (if (not (nil? (map# key#)))
+                                                         (if (not (nil? (get map# key#)))
                                                            ;; work around the contains? bug
                                                            ;; TODO take out, won't work when you store a nil
                                                            ;; (contains? map# key#)
@@ -317,14 +321,15 @@
 
 (defmacro iter [& body]
   (let [parse (iter-expand body)]
-    `(loop ~(apply vector (:initial parse))
-       (cond (or ~@(:return-tests parse))
-             (let ~(apply vector (:post parse))
-               ~(:return-val parse))
-             true
-             (let ~(apply vector (:iteration-lets parse))
-               ~@(:code parse)
-               (recur ~@(:recur parse)))))))
+    `(let ~(apply vector (:lets parse))
+       (loop ~(apply vector (:initial parse))
+         (cond (or ~@(:return-tests parse))
+               (let ~(apply vector (:post parse))
+                 ~(:return-val parse))
+               true
+               (let ~(apply vector (:iteration-lets parse))
+                 ~@(:code parse)
+                 (recur ~@(:recur parse))))))))
 
 (defn- check-form [form required optional]
   "Utility to check the syntax of iter clauses"
