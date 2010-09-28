@@ -274,4 +274,12 @@
                {max x})
          nil))
 
+  (is (= 
+       (iter {for x in [21 43 62 453]}
+             {for i from 0}
+             {returning i}
+             {return-if (= x 62)})
+       2))
+
   )
+
