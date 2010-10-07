@@ -298,5 +298,10 @@
             (catch Exception e e)))
          java.lang.ClassCastException))
 
+  ;; test destructuring for for-on
+  (is (= (iter {for [a b] on [1 2 3]}
+               {collect [a b]})
+         '([1 2] [2 3] [3 nil])))
+
   )
 
