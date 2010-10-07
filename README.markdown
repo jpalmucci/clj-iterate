@@ -263,9 +263,14 @@ previous iterations.
 
 If `pred` is true, immediately exit the loop..
 
-####        {for var = expr}
+####        {for var = expr [type type]}
 
-Not really control flow. Defines a variable inside the loop body.
+Not really control flow. Defines a variable inside the loop body. 
+
+If the `type` option is present, make the variable statically
+typed. This is exactly equivalent to:
+
+           {for ^type var = expr}
 
 ## Clause Quick Reference
 

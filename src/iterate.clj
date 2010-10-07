@@ -44,9 +44,12 @@
 
            (subset? [:for :=] form-keys)
            (do
-             (check-form form #{:for :=} #{})
+             (check-form form #{:for :=} #{:type})
              (merge-with concat
-                         {:iteration-lets `(~(:for form) ~(:= form))}
+                         {:iteration-lets `(~(if (form :type)
+                                               (with-meta (:for form) {:tag (form :type)})
+                                               (:for form))
+                                            ~(:= form))}
                          (iter-expand (rest body))))
 
            (contains? form :repeat)

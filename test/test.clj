@@ -281,5 +281,22 @@
              {return-if (= x 62)})
        2))
 
+  (is (= (class
+          (try 
+            (iter {for x from 1 to 50}
+                  {for y = x type java.lang.String}
+                  (.toString y))
+            (catch Exception e e)))
+         java.lang.ClassCastException))
+
+  ;; test to make sure the compiler is getting the type definition
+  (is (= (class
+          (try 
+            (iter {for x from 1 to 50}
+                  {for ^java.lang.String y = x }
+                  (.toString y))
+            (catch Exception e e)))
+         java.lang.ClassCastException))
+
   )
 
