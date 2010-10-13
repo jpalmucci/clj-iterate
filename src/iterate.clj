@@ -334,11 +334,11 @@
   (let [parse (iter-expand body)]
     `(let ~(apply vector (:lets parse))
        (loop ~(apply vector (:initial parse))
-         (let ~(apply vector (:iteration-lets parse))
-           (cond (or ~@(:return-tests parse))
-                 (let ~(apply vector (:post parse))
-                   ~(:return-val parse))
-                 true
+         (cond (or ~@(:return-tests parse))
+               (let ~(apply vector (:post parse))
+                 ~(:return-val parse))
+               true
+               (let ~(apply vector (:iteration-lets parse))
                  (do ~@(:code parse)
                      (recur ~@(:recur parse)))))))))
 
