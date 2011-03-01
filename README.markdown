@@ -137,13 +137,17 @@ Iterates over successive subsequences of the sequence returned by
 
 All gather clauses support two options: `into` and `if`.
 
-`Into` is used to gather the results into a new loop variable. If a
-gatherer clause does not have an `into` option, the values are
+`Into` is used to gather the results into a new loop variable. `Into`
+clauses are extremely useful if you'd like to calculate more than one
+result during a single pass through the data. You can store each
+result into a new loop variable.
+
+If a gatherer clause does not have an `into` option, the values are
 collected into a hidden variable which will be the return value of the
 iter expression. If more than one gather clause is missing the `into`
 option, the results are undefined. If no gather clauses are missing
-the `into` option, you can use the `returning` clause to specify a value
-to return at the end of the loop.
+the `into` option, you can use the `returning` clause to specify a
+value to return at the end of the loop.
 
 If a gather clause has an `if` option, the clause will only collect the
 value if the provided expression is true.
@@ -203,6 +207,10 @@ This is, in fact, how the `sum` clause is implemented.
 #### {conj expr [ into var ] [ if pred ]}
 
 Collect the values into a set.
+
+#### {concat expr [ into var ] [ if pred ]}
+
+Concatenate the results. 
 
 #### {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
 
@@ -292,6 +300,7 @@ typed. This is exactly equivalent to:
             {collect expr [ into var ] [ if pred ] [initially expr]}
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
             {conj expr [ into var ] [ if pred ]}
+            {concat expr [ into var ] [ if pred ]}
             {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
             {merge expr [ by fn ] [ into var ] [ if pred ]}
             {returning expr}

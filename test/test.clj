@@ -302,6 +302,10 @@
   (is (= (iter {for [a b] on [1 2 3]}
                {collect [a b]})
          '([1 2] [2 3] [3 nil])))
+  
+  (is (= (iter {for x in [ [1 2] [3 4] [5 6] ]}
+               {concat x})
+         [1 2 3 4 5 6]))
 
   )
 

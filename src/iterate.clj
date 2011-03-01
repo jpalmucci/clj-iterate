@@ -321,6 +321,15 @@
                                    :by 'merge)
                                   (rest body))))
 
+           (contains? form :concat)
+           (do (check-form form #{:concat} #{:into :if})
+               (iter-expand (cons (assoc
+                                   (dissoc form :concat)
+                                   :reduce (:concat form) 
+                                   :initially '()
+                                   :by concat)
+                                  (rest body))))
+
            true
            (throw (java.lang.Exception. (str "Unparsable iter form " form) ))))
         
