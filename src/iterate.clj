@@ -8,6 +8,32 @@
 ;; used to represent a reduction with zero items in it
 (defonce *reduce-marker* (Object.))
 
+(defn- merge-checking-frames
+  "Merge the downstream return value of iter-expand with this new chunk, checking to make sure there are no errors"
+  [cur downstream]
+  (let [duplicate-var-names (intersection
+                             (set (map first (partition 2 (cur :initial))))
+                             (set (map first (partition 2 (downstream :initial)))))]
+    (if (not (empty? duplicate-var-names))
+      (throw (java.lang.Exception. (str "Attempted to introduce 2 loop variables with the same name: " duplicate-var-names))))
+    (merge-with concat cur downstream)))
+
+(defn- assoc-checking-frames
+  "assoc the new key values with the downstream return value of
+  iter-expand with this new chunk, checking to make sure there are no
+  errors"
+  [downstream & keys-and-values]
+  (if (empty? keys-and-values)
+        downstream
+        (let [ [key value & rest] keys-and-values ]
+          (cond (= key :initial)
+                (let [duplicate-var-names (intersection
+                                           #{(first value)}
+                                           (set (map first (partition 2 (downstream :initial)))))]
+                  (if (not (empty? duplicate-var-names))
+                    (throw (java.lang.Exception. (str "Attempted to introduct 2 loop variables with the same name: " duplicate-var-names))))))
+          (apply assoc-checking-frames (assoc downstream key value) (next (next keys-and-values))))))
+
 ;; take the body of an iter and expand it into a map of the following items:
 ;; :initial - initial loop variable bindings in [var binding var binding .. ] form
 ;; :recur - recursion values for the :initial, in the same order
@@ -32,20 +58,20 @@
            (do
              (check-form form #{:return-if} #{})
              (let [downstream (iter-expand (rest body))]
-               (assoc downstream
+               (assoc-checking-frames downstream
                  :return-tests
                  (cons (:return-if form) (downstream :return-tests)))))
 
            (contains? form :returning)
            (do
              (check-form form #{:returning} #{})
-             (assoc (iter-expand (rest body))
+             (assoc-checking-frames (iter-expand (rest body))
                :return-val (:returning form)))
 
            (subset? [:for :=] form-keys)
            (do
              (check-form form #{:for :=} #{:type})
-             (merge-with concat
+             (merge-checking-frames
                          {:iteration-lets `(~(if (form :type)
                                                (with-meta (:for form) {:tag (form :type)})
                                                (:for form))
@@ -62,7 +88,7 @@
                                   (rest body)))))
            
            (subset? [:for :from :to] form-keys)
-           (merge-with concat
+           (merge-checking-frames
                        (iter-expand (cons (dissoc form :to) (rest body)))
                        (let [var (gensym)]
                          {:lets (if (form :type)
@@ -77,7 +103,7 @@
                                                    :from (:downfrom form)
                                                    :by (or (:by form) -1))
                                                  (rest body)))]
-               (assoc downstream
+               (assoc-checking-frames downstream
                  :return-tests (cons `(<  ~(:for form) ~(:to form)) (:return-tests downstream)))))
 
            (subset? [:for :downfrom] form-keys)
@@ -107,7 +133,7 @@
            (subset? [:for :in] form-keys)
            (let [seq-var (gensym)]
              (check-form form #{:for :in} #{})
-             (merge-with concat 
+             (merge-checking-frames
                          {:initial (list seq-var (:in form))
                           :recur `((next ~seq-var))
                           :iteration-lets (list (:for form) `(first ~seq-var))
@@ -118,7 +144,7 @@
            (do
              (check-form form #{:for :on} #{})
              (if (symbol? (form :for))
-               (merge-with concat 
+               (merge-checking-frames 
                          (iter-expand (rest body))
                          {:initial (list (:for form) (:on form))
                           :recur `((next ~(:for form)))
@@ -133,7 +159,7 @@
            (subset? [:for :initially :then] form-keys)
            (do 
              (check-form form #{:for :initially :then} #{})
-             (merge-with concat
+             (merge-checking-frames
                          {:initial [(:for form) (:initially form)]
                           :recur [(:then form)]
                           :code ()}
@@ -149,6 +175,7 @@
                                                       `(if ~(:if form)
                                                          (~(:by form) ~(:into form) ~(:reduce form))
                                                          ~(:into form)))]
+               #_
                (merge downstream
                       {:initial (list* (:into form) (if (nil? (:type form))
                                                       (:initially form)
@@ -160,14 +187,24 @@
                                     (:recur downstream))
                        :post (if (:post form)
                                `(~(:into form) (~(:post form) ~(:into form))  ~@(:post downstream))
-                               (:post downstream))})))
+                               (:post downstream))})
+               (merge-checking-frames downstream
+                      {:initial [(:into form) (if (nil? (:type form))
+                                                      (:initially form)
+                                                      `(~(:type form) ~(:initially form)))]
+                       :recur [(if (nil? (:type form))
+                                      new-value-code
+                                      `(~(:type form) ~new-value-code))]
+                       :post (if (:post form)
+                               [(:into form) `(~(:post form) ~(:into form))]
+                               [])})))
 
            (subset? [:reduce :initially] form-keys)
            (do
              (check-form form #{:reduce :by :initially} #{:if :type :post})
              (let [out-var (gensym)
                    downstream (iter-expand (cons (assoc form :into out-var) (rest body)))]
-               (assoc downstream
+               (assoc-checking-frames downstream
                  :return-val out-var)))
 
            ;; reduce case without :initially
@@ -175,7 +212,7 @@
            (do
              (check-form form #{:reduce :by :into} #{:if :type})
              (let [downstream (iter-expand (rest body))]
-               (assoc downstream
+               (assoc-checking-frames downstream
                  :initial (list* (:into form) '*reduce-marker* (:initial downstream))
                  :recur (cons (if (nil? (:if form))
                                 `(cond (= ~(:into form) *reduce-marker*)
@@ -195,7 +232,7 @@
                  downstream (iter-expand (cons (assoc form :into into-var)
                                        (rest body)))]
              (check-form form #{:reduce :by} #{:if :type})
-             (assoc downstream
+             (assoc-checking-frames downstream
                :return-val into-var
                :post (list* into-var `(if (= ~into-var *reduce-marker*) nil ~into-var) (:post downstream))))
 
@@ -224,7 +261,7 @@
            (contains? form :mean)
            (do (check-form form #{:mean} #{:if})
                (let [count (gensym) sum (gensym)]
-                 (merge-with concat
+                 (merge-checking-frames
                              {:initial (list count '(int 0) sum '(double 0))
                               :recur (if (:if form)
                                        `((if ~(:if form) (inc ~count) ~count)
@@ -335,7 +372,7 @@
         
         true
         ;; not an iter clause, just code
-        (merge-with concat
+        (merge-checking-frames
                     {:code (list (first body))}
                     (iter-expand (rest body)))))
 
