@@ -5,6 +5,10 @@ package. I needed a larger subset of common lisp's iterate than
 clj-iter provided. Unfortunately the bit I needed (the INTO clause)
 required a rewrite.
 
+To use clj-iterate, add it to your lein project.clj, as follows:
+       
+        :dependencies [[clj-iterate "0.94"]]
+
 The 'iter' macro takes a list of expressions. Lists are treated as
 clojure code to be executed inside the loop and maps are treated as
 iteration clauses.
