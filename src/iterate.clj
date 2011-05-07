@@ -66,7 +66,7 @@
            (do
              (check-form form #{:returning} #{})
              (assoc-checking-frames (iter-expand (rest body))
-               :return-val (:returning form)))
+                                    :return-val (:returning form)))
 
            (subset? [:for :=] form-keys)
            (do
@@ -89,12 +89,12 @@
            
            (subset? [:for :from :to] form-keys)
            (merge-checking-frames
-                       (iter-expand (cons (dissoc form :to) (rest body)))
-                       (let [var (gensym)]
-                         {:lets (if (form :type)
-                                  `(~var (~(form :type) ~(form :to)))
-                                  `(~var ~(form :to)))
-                          :return-tests `((> ~(:for form) ~var))}))
+            (iter-expand (cons (dissoc form :to) (rest body)))
+            (let [var (gensym)]
+              {:lets (if (form :type)
+                       `(~var (~(form :type) ~(form :to)))
+                       `(~var ~(form :to)))
+               :return-tests `((> ~(:for form) ~var))}))
 
            (subset? [:for :downfrom :to] form-keys)
            (do
@@ -154,17 +154,22 @@
                  (iter-expand `({for iter-var# on ~(form :on)}
                                 {for ~(form :for) = iter-var#}
                                 ~@(rest body))))))
-                     
-           
-           (subset? [:for :initially :then] form-keys)
-           (do 
-             (check-form form #{:for :initially :then} #{})
-             (merge-checking-frames
-                         {:initial [(:for form) (:initially form)]
-                          :recur [(:then form)]
-                          :code ()}
-                         (iter-expand (rest body))))
 
+           (subset? [:for :initially] form-keys)
+           (do (check-form form #{:for :initially :then} #{:until :type})
+               (if (contains? form :until)
+                 (merge-checking-frames
+                  (iter-expand (cons (dissoc form :until) (rest body)))
+                  {:return-tests `(~(:until form))})
+                 (merge-checking-frames
+                  {:initial [(:for form) (if (contains? form-keys :type)
+                                           `(~(:type form) ~(:initially form))
+                                           (:initially form))]
+                   :recur [(if (contains? form-keys :type)
+                             `(~(:type form) ~(:then form))
+                             (:then form))]}
+                  (iter-expand (rest body)))))
+                    
            ;; reduce case with :initially
            (subset? [:reduce :into :initially] form-keys)
            (do
@@ -175,19 +180,6 @@
                                                       `(if ~(:if form)
                                                          (~(:by form) ~(:into form) ~(:reduce form))
                                                          ~(:into form)))]
-               #_
-               (merge downstream
-                      {:initial (list* (:into form) (if (nil? (:type form))
-                                                      (:initially form)
-                                                      `(~(:type form) ~(:initially form)))
-                                       (:initial downstream))
-                       :recur (cons (if (nil? (:type form))
-                                      new-value-code
-                                      `(~(:type form) ~new-value-code))
-                                    (:recur downstream))
-                       :post (if (:post form)
-                               `(~(:into form) (~(:post form) ~(:into form))  ~@(:post downstream))
-                               (:post downstream))})
                (merge-checking-frames downstream
                       {:initial [(:into form) (if (nil? (:type form))
                                                       (:initially form)

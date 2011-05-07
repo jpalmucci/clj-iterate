@@ -309,5 +309,13 @@
                {concat x})
          [1 2 3 4 5 6]))
 
+  (is (= (iter {for x initially 1 then (+ x 2) until (> x 10)}
+               {collect x})
+         [1 3 5 7 9]))
+  (is (= (iter {for x type int initially 1 then (+ x 2) until (> x 10)}
+               {collect x})
+         
+         [1 3 5 7 9]))
+
   )
 

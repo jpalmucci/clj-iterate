@@ -1,4 +1,4 @@
-# clj-iterate - An iteration macro patterned after Common Lisp's Iterate
+# clj-iterate - An iteration macro similar to Common Lisp's Iterate
 
 I wrote clj-iterate after using Daniel Janus excellent [clj-iter] [1]
 package. I needed a larger subset of common lisp's iterate than
@@ -136,6 +136,14 @@ would probably slow the loop down.
 
 Iterates over successive subsequences of the sequence returned by
 `expr`, binding `var` to each subsequence.
+
+### Other Driver Clauses
+
+####        {for var initially expr then expr [until expr] [type expr]}
+
+General construct for doing `loop` like iteration within iter. Sets
+var to `initially` on first pass, then to `then` on successive
+passes. Terminates if the `until` expression is true.
 
 ## Gatherer Clauses
 
@@ -290,6 +298,7 @@ typed. This is exactly equivalent to:
 
             {for var from expr [to expr] [by expr] [type type]} 
             {for var downfrom expr [to expr] [by expr] [type type]}
+            {for var initially expr then expr [until expr] [type type]}
             {repeat n [using var]}        
             {for var in expr}
             {for var on expr}
