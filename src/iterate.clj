@@ -1,5 +1,5 @@
 (ns iterate
-  (:use clojure.test clojure.set clojure.walk))
+  (:use clojure.test clojure.set))
 
 ;; stub implementation (the real implementation uses the iter macro, below)
 (defn- check-form [form required optional]
@@ -41,6 +41,7 @@
 ;; :lets- - variables computed and bound outside the loop
 ;; :return-val - the value to return when the looping terminates
 ;; :return-tests - a list of predicates. if any eval to true, looping is finished
+;; :in-scope-return-tests - a list of predicates. if any eval to true, looping is finished. Eval in scope of the iteration vars
 ;; :post - a list of var form pair that should be applied to the variable before returning
 ;; :code - code that should be evalled each time through the loop
 (defn iter-expand [body]
@@ -59,7 +60,7 @@
              (check-form form #{:return-if} #{})
              (let [downstream (iter-expand (rest body))]
                (assoc-checking-frames downstream
-                 :return-tests
+                 :in-scope-return-tests
                  (cons (:return-if form) (downstream :return-tests)))))
 
            (contains? form :returning)
@@ -377,8 +378,14 @@
                  ~(:return-val parse))
                true
                (let ~(apply vector (:iteration-lets parse))
-                 (do ~@(:code parse)
-                     (recur ~@(:recur parse)))))))))
+                 ~(if (:in-scope-return-tests parse)
+                    `(if (or ~@(:in-scope-return-tests parse))
+                       (let ~(apply vector (:post parse))
+                         ~(:return-val parse))
+                       (do ~@(:code parse)
+                           (recur ~@(:recur parse))))
+                    `(do ~@(:code parse)
+                         (recur ~@(:recur parse))))))))))
 
 (defn- check-form [form required optional]
   "Utility to check the syntax of iter clauses"
