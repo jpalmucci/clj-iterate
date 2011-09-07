@@ -6,7 +6,7 @@
   )
 
 ;; used to represent a reduction with zero items in it
-(defonce *reduce-marker* (Object.))
+(defonce +reduce-marker+ (Object.))
 
 (defn- merge-checking-frames
   "Merge the downstream return value of iter-expand with this new chunk, checking to make sure there are no errors"
@@ -206,15 +206,15 @@
              (check-form form #{:reduce :by :into} #{:if :type})
              (let [downstream (iter-expand (rest body))]
                (assoc-checking-frames downstream
-                 :initial (list* (:into form) '*reduce-marker* (:initial downstream))
+                 :initial (list* (:into form) '+reduce-marker+ (:initial downstream))
                  :recur (cons (if (nil? (:if form))
-                                `(cond (= ~(:into form) *reduce-marker*)
+                                `(cond (= ~(:into form) +reduce-marker+)
                                        ~(:reduce form)
                                        true
                                        (~(:by form) ~(:into form) ~(:reduce form)))
                                 `(cond (not ~(:if form))
                                        ~(:into form)
-                                       (= ~(:into form) *reduce-marker*)
+                                       (= ~(:into form) +reduce-marker+)
                                        ~(:reduce form)
                                        true
                                        (~(:by form) ~(:into form) ~(:reduce form)))) (:recur downstream)))))
@@ -227,7 +227,7 @@
              (check-form form #{:reduce :by} #{:if :type})
              (assoc-checking-frames downstream
                :return-val into-var
-               :post (list* into-var `(if (= ~into-var *reduce-marker*) nil ~into-var) (:post downstream))))
+               :post (list* into-var `(if (= ~into-var +reduce-marker+) nil ~into-var) (:post downstream))))
 
 
            (contains? form :collect)

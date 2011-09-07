@@ -1,5 +1,8 @@
+
 (defproject clj-iterate/clj-iterate "0.95-SNAPSHOT"
   :description "An iteration macro along the lines of Common Lisp Iterate."
-  :dependencies [[org.clojure/clojure "1.2.0"] 
-                 [org.clojure/clojure-contrib "1.2.0"]] )
+  :multi-deps {"1.3" [[org.clojure/clojure "1.3.0-beta3"]]
+               "1.2" [[org.clojure/clojure "1.2.1"]]}
+  :dev-dependencies [[lein-multi "1.1.0-SNAPSHOT"]])
+  
 
