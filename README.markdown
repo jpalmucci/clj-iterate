@@ -7,7 +7,7 @@ required a rewrite.
 
 To use clj-iterate, add it to your lein project.clj, as follows:
        
-        :dependencies [[clj-iterate "0.95-SNAPSHOT"]]
+        :dependencies [[clj-iterate "0.96"]]
 
 The 'iter' macro takes a list of expressions. Lists are treated as
 clojure code to be executed inside the loop and maps are treated as
