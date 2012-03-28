@@ -216,11 +216,11 @@ function need not accept zero elements. Therefore, we could implement
 
 This is, in fact, how the `sum` clause is implemented.
 
-#### {conj expr [ into var ] [ if pred ]}
+#### {conj expr [ into var ] [ if pred ] [initially expr] }
 
-Collect the values into a set.
+Collect the values into a set (or the data type provided by the initially expr).
 
-#### {concat expr [ into var ] [ if pred ]}
+#### {concat expr [ into var ] [ if pred ] initially expr}
 
 Concatenate the results. 
 
@@ -267,7 +267,7 @@ example, creating less garbage, like so:
          9 (99 89 79 69 59 49 39 29 19 9)}
         user> 
 
-#### {merge expr [by fn] [ into var ] [ if pred ]}
+#### {merge expr [by fn] [ into var ] [ if pred ] [initially expr]}
 
 Expr should return a map. All maps are merged, as in the clojure merge
 function. 
@@ -312,10 +312,10 @@ typed. This is exactly equivalent to:
             {mean expr [ if pred ]}
             {collect expr [ into var ] [ if pred ] [initially expr]}
             {reduce expr by reduce-fn  [ initially expr ] [ into var ] [ if pred ]  [type type]}
-            {conj expr [ into var ] [ if pred ]}
-            {concat expr [ into var ] [ if pred ]}
+            {conj expr [ into var ] [ if pred ] [initially expr]}
+            {concat expr [ into var ] [ if pred ] [initially expr]}
             {assoc expr key key [by reduce-fn] [ initially expr ] [ into var ] [ if pred ]}
-            {merge expr [ by fn ] [ into var ] [ if pred ]}
+            {merge expr [ by fn ] [ into var ] [ if pred ] [initially expr]}
             {returning expr}
 
 ### Control Flow

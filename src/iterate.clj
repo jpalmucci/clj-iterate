@@ -237,7 +237,7 @@
                                     :by 'conj
                                     :initially (if (contains? form :initially)
                                                  (form :initially)
-                                                 '(clojure.lang.PersistentQueue/EMPTY))
+                                                 [])
                                     :post '(fn [x] (seq x)))
                                   (rest body))))
 
@@ -324,39 +324,42 @@
                                   (rest body))))
 
            (contains? form :conj)
-           (do (check-form form #{:conj} #{:into :if})
+           (do (check-form form #{:conj} #{:into :if :initially})
                (iter-expand (cons (assoc
                                    (dissoc form :conj)
                                    :reduce (:conj form) 
-                                   :initially '(transient #{})
+                                   :initially
+                                   (if (:initially form)
+                                     `(transient ~(:initially form))
+                                     `(transient #{}))
                                    :post '(fn [x] (persistent! x))
                                    :by 'conj!)
                                   (rest body))))
 
            (subset? '(:merge :by) form-keys)
-           (do (check-form form #{:merge :by} #{:into :if})
+           (do (check-form form #{:merge :by} #{:into :if :initially})
                (iter-expand (cons (assoc
                                       (dissoc form :merge :by)
                                     :reduce (:merge form) 
-                                    :initially '{}
+                                    :initially (or (:initially form) '{})
                                     :by `(fn [x# y#] (merge-with ~(form :by) x# y#)))
                                   (rest body))))
            
            (contains? form :merge)
-           (do (check-form form #{:merge} #{:into :if})
+           (do (check-form form #{:merge} #{:into :if :initially})
                (iter-expand (cons (assoc
                                    (dissoc form :merge)
                                    :reduce (:merge form) 
-                                   :initially '{}
+                                   :initially (or (:initially form) '{})
                                    :by 'merge)
                                   (rest body))))
 
            (contains? form :concat)
-           (do (check-form form #{:concat} #{:into :if})
+           (do (check-form form #{:concat} #{:into :if :initially})
                (iter-expand (cons (assoc
                                    (dissoc form :concat)
                                    :reduce (:concat form) 
-                                   :initially '()
+                                   :initially (or (:initially form) '())
                                    :by concat)
                                   (rest body))))
 
